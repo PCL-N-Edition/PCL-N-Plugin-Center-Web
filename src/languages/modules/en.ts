@@ -301,7 +301,9 @@ export default {
     sync: "Sync",
     switch: "Switch",
     publish: "Publish",
-    catalog: "Catalog"
+    catalog: "Catalog",
+    minimize: "Minimize",
+    restoreMinimized: "Restore form window"
   },
   home: {
     welcome: "Welcome"

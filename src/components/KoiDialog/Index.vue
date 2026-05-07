@@ -1,22 +1,35 @@
 <template>
   <!-- append-to-body 点击空白处不关闭弹窗 -->
   <el-dialog
+    class="koi-dialog-shell"
     :model-value="visible"
     :title="title"
     :width="dialogWidth"
     :center="center"
+    :align-center="alignCenter"
     :close-on-click-modal="closeOnClickModel"
     append-to-body
     draggable
     :destroy-on-close="destroyOnClose"
     :before-close="koiClose"
-    :fullscreen="fullscreen"
+    :fullscreen="dialogFullscreen"
     :loading="loading"
     :footerHidden="footerHidden"
+    :show-close="!showWindowShell"
   >
+    <template v-if="showWindowShell" #header>
+      <div class="koi-dialog-custom-header">
+        <span class="el-dialog__title">{{ title }}</span>
+        <KoiShellHeaderActions
+          :is-fullscreen="dialogFullscreen"
+          @minimize="minimize"
+          @toggle-fullscreen="toggleFullscreen"
+          @close="koiClose"
+        />
+      </div>
+    </template>
     <slot name="header"></slot>
-    <div class="dialog-content-wrapper" :style="fullscreen ? { height: 'auto' } : { height: height + 'px' }">
-      <!-- 具名插槽 -->
+    <div class="dialog-content-wrapper" :style="dialogFullscreen ? { height: 'auto' } : { height: height + 'px' }">
       <slot name="content"></slot>
     </div>
     <template #footer v-if="!footerHidden">
@@ -28,40 +41,53 @@
       </span>
     </template>
   </el-dialog>
+  <KoiShellMinimizedDock
+    :visible="minimized"
+    :title="title"
+    :tooltip="$t('button.restoreMinimized')"
+    :stack-index="dockStackIndex"
+    @restore="restoreFromDock"
+  />
 </template>
 
-<!-- 此弹窗封装将使用 defineExpose，通过ref进行使用 -->
 <script setup lang="ts">
 import { ref, toRefs, computed, onMounted, onUnmounted } from "vue";
 import { koiMsgWarning } from "@/utils/koi.ts";
 import { ElMessageBox } from "element-plus";
 import { useI18n } from "vue-i18n";
+import { useKoiWindowShell } from "@/composables/useKoiWindowShell.ts";
+import KoiShellHeaderActions from "@/components/KoiWindowShell/KoiShellHeaderActions.vue";
+import KoiShellMinimizedDock from "@/components/KoiWindowShell/KoiShellMinimizedDock.vue";
 
 const { t } = useI18n();
 
-// 定义参数的类型
 interface IDialogProps {
   title?: string;
   visible?: boolean;
   width?: number;
+  /** 标题与页脚内容是否居中排版 */
   center?: boolean;
+  /** 弹窗是否在视口中水平、垂直居中（对应 el-dialog 的 align-center） */
+  alignCenter?: boolean;
   height?: number;
   closeOnClickModel?: boolean;
   confirmText?: string;
   cancelText?: string;
   destroyOnClose?: boolean;
+  /** 打开时是否全屏（可用右上角按钮切换） */
   fullscreen?: boolean;
   loading?: boolean;
-  footerHidden?: boolean; // 是否隐藏确认和取消按钮部分
+  footerHidden?: boolean;
+  /** 是否显示右上角窗口壳操作区（收起 / 全屏 / 关闭） */
+  showWindowShell?: boolean;
 }
 
-// 子组件接收父组件的值
-// withDefaults：设置默认值  defineProps：接收父组件的参数
 const props = withDefaults(defineProps<IDialogProps>(), {
   title: "KoiDialog",
   height: 300,
   width: 650,
   center: true,
+  alignCenter: true,
   visible: false,
   closeOnClickModel: false,
   confirmText: "",
@@ -69,45 +95,44 @@ const props = withDefaults(defineProps<IDialogProps>(), {
   destroyOnClose: false,
   fullscreen: false,
   loading: false,
-  footerHidden: false
+  footerHidden: false,
+  showWindowShell: true
 });
 
-// 开关变量
 const visible = ref(false);
-
-// 确定按钮Loading，此处必须用toRefs，否则将失去响应式
 const { loading, width } = toRefs(props);
 const confirmLoading = ref(loading);
 
-// 响应式窗口宽度
+const {
+  minimized,
+  fullscreen: windowFullscreen,
+  minimize,
+  restoreFromDock,
+  toggleFullscreen,
+  clearMinimized,
+  dockStackIndex
+} = useKoiWindowShell(visible, () => props.fullscreen);
+
+const dialogFullscreen = computed(() => windowFullscreen.value);
+
 const windowWidth = ref(window.innerWidth);
 
-// 计算对话框宽度，在页面小于600px时使用90%宽度
 const dialogWidth = computed(() => {
-  // 如果设置了全屏，直接返回100%
-  if (props.fullscreen) {
+  if (dialogFullscreen.value) {
     return "100%";
   }
-
-  // 如果窗口宽度小于600px，使用90%宽度
   if (windowWidth.value < 600) {
     return "90%";
   }
-
-  // 如果对话框宽度大于窗口宽度，使用90%宽度
   if (width.value > windowWidth.value) {
     return "90%";
   }
-
- // 如果对话框宽度大于窗口宽度的95%，使用95%宽度（更平滑的过渡）
   if (width.value > windowWidth.value * 0.95) {
     return "95%";
   }
-
   return width.value;
 });
 
-// 监听窗口大小变化
 const handleResize = () => {
   windowWidth.value = window.innerWidth;
 };
@@ -120,12 +145,10 @@ onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
 });
 
-/** 打开对话框 */
 const koiOpen = () => {
   visible.value = true;
 };
 
-/** 取消对话框 */
 const koiClose = () => {
   if (!props.closeOnClickModel) {
     ElMessageBox.confirm(t("msg.closeTips"), t("msg.remind"), {
@@ -135,6 +158,7 @@ const koiClose = () => {
     })
       .then(() => {
         visible.value = false;
+        clearMinimized();
         koiMsgWarning(t("msg.closed"));
       })
       .catch(() => {
@@ -142,28 +166,25 @@ const koiClose = () => {
       });
   } else {
     visible.value = false;
+    clearMinimized();
   }
 };
 
-/** 确认提交后关闭对话框 */
 const koiQuickClose = () => {
+  clearMinimized();
   visible.value = false;
 };
 
-// 当前组件获取父组件传递的事件方法
 const emits = defineEmits(["koiConfirm", "koiCancel"]);
 
-/** 对话框确定事件 */
 const koiConfirm = () => {
   emits("koiConfirm");
 };
 
-/** 对话框的取消事件 */
 const koiCancel = () => {
   emits("koiCancel");
 };
 
-/** 暴露给父组件方法 */
 defineExpose({
   koiOpen,
   koiClose,
@@ -172,13 +193,35 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+.koi-dialog-custom-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding-right: 0;
+
+  .el-dialog__title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .dialog-content-wrapper {
   box-sizing: border-box;
-  padding-right: 6px; // 为滚动条预留空间
+  padding-right: 6px;
   overflow: hidden auto;
-  // 确保内容不会被滚动条覆盖
+
   & > * {
     padding-right: 4px;
   }
+}
+</style>
+
+<style lang="scss">
+.koi-dialog-shell .el-dialog__header {
+  margin-right: 0;
 }
 </style>

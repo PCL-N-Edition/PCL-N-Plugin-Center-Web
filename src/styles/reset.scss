@@ -6,13 +6,31 @@ body,
   margin: 0;
 }
 
-/* 去除a链接下划线 #409EFF */
+/*
+ * 抽屉/弹窗关闭时，Element Plus 会撤掉 body 上的滚动锁与 width 补偿（见 useLockscreen），
+ * 纵向滚动条恢复与宽度回弹之间常有一帧 scrollWidth > clientWidth，浏览器会闪一下横向滚动条。
+ * 根级禁止横向溢出即可消除（不影响布局内各区域的 overflow-x: auto）。
+ */
+html {
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+}
+
 a {
   color: var(--el-color-primary);
   text-decoration: none;
   outline: 0;
+  transition: color var(--el-transition-duration-fast, 0.2s) ease;
 }
 
-a:hover {
-  color: #0a16f1;
+a:hover,
+a:focus {
+  color: var(--el-color-primary-light-3);
+}
+
+a:active {
+  color: var(--el-color-primary-dark-2);
 }

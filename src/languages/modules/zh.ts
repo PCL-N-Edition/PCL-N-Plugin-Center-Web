@@ -300,7 +300,9 @@ export default {
     sync: "同步",
     switch: "切换",
     publish: "发布",
-    catalog: "目录"
+    catalog: "目录",
+    minimize: "收起窗口",
+    restoreMinimized: "恢复表单窗口"
   },
   home: {
     welcome: "欢迎使用"
