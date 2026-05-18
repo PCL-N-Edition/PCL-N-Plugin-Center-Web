@@ -1,43 +1,55 @@
 <template>
   <div class="upload-box">
-    <el-upload
-      v-model:file-list="_fileList"
-      action="#"
-      list-type="picture-card"
-      :class="['upload', uploadDisabled ? 'disabled' : '', drag ? 'no-border' : '']"
-      :multiple="true"
-      :disabled="uploadDisabled"
-      :limit="limit"
-      :http-request="handleHttpUpload"
-      :before-upload="beforeUpload"
-      :on-exceed="handleExceed"
-      :on-success="uploadSuccess"
-      :on-error="uploadError"
-      :drag="drag"
-      :accept="fileType.join(',')"
-      :folderName="folderName"
-      :fileParam="fileParam"
-    >
-      <div class="upload-content">
-        <slot name="content">
-          <el-icon><Plus /></el-icon>
-          <!-- <span>请上传图片</span> -->
-        </slot>
-      </div>
-      <template #file="{ file }">
-        <img :src="file.url" class="upload-image" />
-        <div class="upload-operator" @click.stop>
-          <div class="upload-icon" @click="handlePictureCardPreview(file)">
-            <el-icon><ZoomIn /></el-icon>
-            <span>查看</span>
-          </div>
-          <div v-if="!imageDisabled" class="upload-icon" @click="handleRemove(file)">
-            <el-icon><Delete /></el-icon>
-            <span>删除</span>
-          </div>
+    <div class="upload-with-progress">
+      <el-upload
+        v-model:file-list="_fileList"
+        action="#"
+        list-type="picture-card"
+        :class="['upload', uploadDisabled ? 'disabled' : '', drag ? 'no-border' : '']"
+        :multiple="true"
+        :disabled="uploadDisabled"
+        :limit="limit"
+        :http-request="handleHttpUpload"
+        :before-upload="beforeUpload"
+        :on-exceed="handleExceed"
+        :on-success="uploadSuccess"
+        :on-error="uploadError"
+        :drag="drag"
+        :accept="fileType.join(',')"
+        :folderName="folderName"
+        :fileParam="fileParam"
+      >
+        <div class="upload-content">
+          <slot name="content">
+            <el-icon><Plus /></el-icon>
+            <!-- <span>请上传图片</span> -->
+          </slot>
         </div>
-      </template>
-    </el-upload>
+        <template #file="{ file }">
+          <img :src="file.url" class="upload-image" />
+          <div class="upload-operator" @click.stop>
+            <div class="upload-icon" @click="handlePictureCardPreview(file)">
+              <el-icon><ZoomIn /></el-icon>
+              <span>查看</span>
+            </div>
+            <div v-if="!imageDisabled" class="upload-icon" @click="handleRemove(file)">
+              <el-icon><Delete /></el-icon>
+              <span>删除</span>
+            </div>
+          </div>
+        </template>
+      </el-upload>
+      <transition name="el-fade-in-linear">
+        <div v-if="activeUploadCount > 0" class="upload-progress-layerupload-progress-layer">
+          <el-progress
+            type="circle"
+            :percentage="aggregatedUploadPercent"
+            :width="progressCircleSize"
+            :stroke-width="5"
+          />
+        </div>
+      </transition>
+    </div>
     <div class="el-upload-tip">
       <slot name="tip"></slot>
     </div>
@@ -47,7 +59,6 @@
 
 <script setup lang="ts" name="KoiUploadImages">
 import { ref, computed, inject, watch, onBeforeUnmount } from "vue";
-import { ElLoading } from "element-plus";
 import koi from "@/utils/axios.ts";
 import { koiNoticeSuccess, koiNoticeWarning, koiNoticeError } from "@/utils/koi.ts";
 import type { UploadProps, UploadFile, UploadUserFile, UploadRequestOptions } from "element-plus";
@@ -97,11 +108,27 @@ const uploadDisabled = computed(() => {
   return imageDisabled.value || _fileList.value.length >= props.limit;
 });
 
+/** 多文件可能并发上传：按 uid 记录进度，遮罩展示平均值 */
+const activeUploadCount = ref(0);
+const uploadPercentByUid = ref<Record<number, number>>({});
+
+const aggregatedUploadPercent = computed(() => {
+  const vals = Object.values(uploadPercentByUid.value);
+  if (!vals.length) return 0;
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+});
+
+const progressCircleSize = computed(() => {
+  const w = Number.parseInt(String(props.width), 10);
+  const h = Number.parseInt(String(props.height), 10);
+  const m = Math.min(Number.isFinite(w) ? w : 120, Number.isFinite(h) ? h : 120);
+  return Math.max(56, Math.floor(m * 0.55));
+});
+
 // 监听 props.fileList 列表默认值改变
 watch(
   () => props.fileList,
   (n: UploadUserFile[]) => {
-    console.log("props.fileList", props.fileList);
     _fileList.value = n;
   }
 );
@@ -133,18 +160,40 @@ const handleHttpUpload = async (options: UploadRequestOptions) => {
   formData.append("folderName", props.folderName);
   formData.append("fileParam", props.fileParam === "-1" || props.fileParam === "" ? "-1" : props.fileParam);
 
-  const loadingInstance = ElLoading.service({
-    text: "正在上传",
-    background: "rgba(0,0,0,.2)"
-  });
+  const uid = options.file.uid;
+  activeUploadCount.value++;
+  uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: 0 };
+
+  const notifyProgress = (loaded: number, total?: number) => {
+    let pct = 0;
+    if (total !== undefined && total > 0) {
+      pct = Math.min(100, Math.round((loaded * 100) / total));
+    }
+    uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: pct };
+    options.onProgress?.({
+      percent: pct,
+      loaded,
+      total: total ?? 0
+    } as ProgressEvent & { percent: number });
+  };
 
   try {
-    const res: any = await koi.upload(props.action, formData);
-    options.onSuccess(import.meta.env.VITE_SERVER + res.data?.fileUploadPath);
-    loadingInstance.close();
+    const res: any = await koi.upload(props.action, formData, {
+      onUploadProgress: (e: { loaded: number; total?: number }) => {
+        notifyProgress(e.loaded, e.total);
+      }
+    });
+    uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: 100 };
+    const url = import.meta.env.VITE_SERVER + res.data?.fileUploadPath;
+    // 返回 url 字符串，仅由 Promise 触发一次 onSuccess；勿再手动 options.onSuccess
+    return url;
   } catch (error) {
-    loadingInstance.close();
-    options.onError(error as any);
+    throw error;
+  } finally {
+    const next = { ...uploadPercentByUid.value };
+    delete next[uid];
+    uploadPercentByUid.value = next;
+    activeUploadCount.value = Math.max(0, activeUploadCount.value - 1);
   }
 };
 
@@ -251,6 +300,23 @@ onBeforeUnmount(() => {
   }
 }
 .upload-box {
+  .upload-with-progress {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+  }
+  .upload-progress-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: v-bind(borderRadius);
+    background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+    pointer-events: none;
+  }
   .no-border {
     :deep(.el-upload--picture-card) {
       border: none !important;

@@ -81,18 +81,40 @@ import { InputInstance } from "element-plus";
 import useAuthStore from "@/stores/modules/auth.ts";
 import { useRouter } from "vue-router";
 import { useDebounceFn } from "@vueuse/core";
+import { useI18n } from "vue-i18n";
 import { getMenuLanguage } from "@/utils/index.ts";
 
 const router = useRouter();
 const authStore = useAuthStore();
-const menuList: any = computed(() => authStore.menuList.filter((item: any) => item.meta.isVisible == "1" && item.meta.parentId != "0"));
+const { locale } = useI18n();
 
-// 转换菜单数据，添加国际化标题
+/**
+ * 与侧边栏一致：只收录可见菜单；有可见子节点则继续递归，仅叶子（可点击项）进入搜索。
+ * 数据源用 recursiveMenuList，包含 staticRouter 与后端动态路由，解决仅 menuList（仅后端扁平）搜不到静态菜单的问题。
+ */
+function flattenVisibleLeafMenus(routes: any[] | undefined, bucket: any[] = []): any[] {
+  if (!Array.isArray(routes)) return bucket;
+  for (const item of routes) {
+    if (String(item?.meta?.isVisible) !== "1") continue;
+    const visibleChildren = (item.children || []).filter((c: any) => String(c?.meta?.isVisible) === "1");
+    if (visibleChildren.length > 0) {
+      flattenVisibleLeafMenus(visibleChildren, bucket);
+    } else {
+      bucket.push(item);
+    }
+  }
+  return bucket;
+}
+
+const menuList: any = computed(() => flattenVisibleLeafMenus(authStore.recursiveMenuList));
+
+// 转换菜单数据，添加国际化标题（依赖 locale，切换语言后标题与搜索匹配会更新）
 const localizedMenuList: any = computed(() => {
+  locale.value;
   return menuList.value.map((item: any) => ({
     ...item,
-    localizedTitle: getMenuLanguage(item.meta.title),
-    originalTitle: item.meta.title
+    localizedTitle: getMenuLanguage(item.meta?.title ?? ""),
+    originalTitle: item.meta?.title ?? ""
   }));
 });
 
@@ -226,6 +248,10 @@ const updateSearchList = () => {
 const debouncedUpdateSearchList = useDebounceFn(updateSearchList, 300);
 
 watch(searchMenu, debouncedUpdateSearchList);
+
+watch(locale, () => {
+  if (isShowSearch.value) updateSearchList();
+});
 
 const menuListRef = ref<Element | null>(null);
 const keyPressUpOrDown = (direction: number) => {

@@ -1,47 +1,59 @@
 <template>
   <div class="upload-box">
-    <el-upload
-      :id="uuid"
-      action="#"
-      :class="['upload', imageDisabled ? 'disabled' : '', drag ? 'no-border' : '']"
-      :multiple="false"
-      :disabled="imageDisabled"
-      :show-file-list="false"
-      :http-request="handleHttpUpload"
-      :before-upload="beforeUpload"
-      :on-success="uploadSuccess"
-      :on-error="uploadError"
-      :drag="drag"
-      :accept="fileType.join(',')"
-      :folderName="folderName"
-      :fileParam="fileParam"
-    >
-      <template v-if="imageUrl">
-        <img :src="imageUrl" class="upload-image" />
-        <div class="upload-operate" @click.stop>
-          <div v-if="!imageDisabled" class="upload-icon" @click="handleEditImage">
-            <el-icon><Edit /></el-icon>
-            <span>编辑</span>
+    <div class="upload-with-progress">
+      <el-upload
+        :id="uuid"
+        action="#"
+        :class="['upload', imageDisabled ? 'disabled' : '', drag ? 'no-border' : '']"
+        :multiple="false"
+        :disabled="imageDisabled"
+        :show-file-list="false"
+        :http-request="handleHttpUpload"
+        :before-upload="beforeUpload"
+        :on-success="uploadSuccess"
+        :on-error="uploadError"
+        :drag="drag"
+        :accept="fileType.join(',')"
+        :folderName="folderName"
+        :fileParam="fileParam"
+      >
+        <template v-if="imageUrl">
+          <img :src="imageUrl" class="upload-image" />
+          <div class="upload-operate" @click.stop>
+            <div v-if="!imageDisabled" class="upload-icon" @click="handleEditImage">
+              <el-icon><Edit /></el-icon>
+              <span>编辑</span>
+            </div>
+            <div class="upload-icon" @click="imageViewShow = true">
+              <el-icon><ZoomIn /></el-icon>
+              <span>查看</span>
+            </div>
+            <div v-if="!imageDisabled" class="upload-icon" @click="handleDeleteImage">
+              <el-icon><Delete /></el-icon>
+              <span>删除</span>
+            </div>
           </div>
-          <div class="upload-icon" @click="imageViewShow = true">
-            <el-icon><ZoomIn /></el-icon>
-            <span>查看</span>
+        </template>
+        <template v-else>
+          <div class="upload-content">
+            <slot name="content">
+              <el-icon><Plus /></el-icon>
+              <!-- <span>请上传图片</span> -->
+            </slot>
           </div>
-          <div v-if="!imageDisabled" class="upload-icon" @click="handleDeleteImage">
-            <el-icon><Delete /></el-icon>
-            <span>删除</span>
-          </div>
+        </template>
+      </el-upload>
+      <transition name="el-fade-in-linear">
+        <div v-if="uploading" class="upload-progress-layer">
+          <el-progress
+            type="circle"
+            :percentage="uploadPercent"
+            :width="progressCircleSize"
+            :stroke-width="5"
+          />
         </div>
-      </template>
-      <template v-else>
-        <div class="upload-content">
-          <slot name="content">
-            <el-icon><Plus /></el-icon>
-            <!-- <span>请上传图片</span> -->
-          </slot>
-        </div>
-      </template>
-    </el-upload>
+      </transition>
+    </div>
     <div class="upload-tip">
       <slot name="tip"></slot>
     </div>
@@ -51,7 +63,6 @@
 
 <script setup lang="ts" name="KoiUploadImage">
 import { ref, computed, inject } from "vue";
-import { ElLoading } from "element-plus";
 import { generateUUID } from "@/utils";
 import koi from "@/utils/axios.ts";
 import { ElNotification, formContextKey, formItemContextKey } from "element-plus";
@@ -89,6 +100,17 @@ const props = withDefaults(defineProps<IUploadImageProps>(), {
 // 生成组件唯一id
 const uuid = ref("id-" + generateUUID());
 
+/** 上传中遮罩与进度（axios onUploadProgress） */
+const uploading = ref(false);
+const uploadPercent = ref(0);
+
+const progressCircleSize = computed(() => {
+  const w = Number.parseInt(String(props.width), 10);
+  const h = Number.parseInt(String(props.height), 10);
+  const m = Math.min(Number.isFinite(w) ? w : 120, Number.isFinite(h) ? h : 120);
+  return Math.max(56, Math.floor(m * 0.55));
+});
+
 // 查看图片
 const imageViewShow = ref(false);
 // 获取 el-form 组件上下文
@@ -117,22 +139,41 @@ const handleHttpUpload = async (options: UploadRequestOptions) => {
   formData.append("folderName", props.folderName);
   formData.append("fileParam", props.fileParam === "-1" || props.fileParam === "" ? "-1" : props.fileParam);
 
-  const loadingInstance = ElLoading.service({
-    text: "正在上传",
-    background: "rgba(0,0,0,.2)"
-  });
+  uploading.value = true;
+  uploadPercent.value = 0;
+
+  const notifyProgress = (loaded: number, total?: number) => {
+    let pct = 0;
+    if (total !== undefined && total > 0) {
+      pct = Math.min(100, Math.round((loaded * 100) / total));
+    }
+    uploadPercent.value = pct;
+    options.onProgress?.({
+      percent: pct,
+      loaded,
+      total: total ?? 0
+    } as ProgressEvent & { percent: number });
+  };
 
   try {
-    const res: any = await koi.upload(props.action, formData);
+    const res: any = await koi.upload(props.action, formData, {
+      onUploadProgress: (e: { loaded: number; total?: number }) => {
+        notifyProgress(e.loaded, e.total);
+      }
+    });
+    uploadPercent.value = 100;
     const fileUrl = import.meta.env.VITE_SERVER + res.data?.fileUploadPath;
     emit("update:imageUrl", fileUrl);
     emit("success", fileUrl);
-    loadingInstance.close();
-    // 调用 el-form 内部的校验方法[可自动校验]
+    // 仅通过 return 让 el-upload 对 httpRequest 返回的 Promise 执行一次 onSuccess，切勿再手动 options.onSuccess，否则会提示两次
     formItemContext?.prop && formContext?.validateField([formItemContext.prop as string]);
+    return res;
   } catch (error) {
-    loadingInstance.close();
-    options.onError(error as any);
+    // 交给 el-upload 的 Promise.reject 分支调用一次 onError
+    throw error;
+  } finally {
+    uploading.value = false;
+    uploadPercent.value = 0;
   }
 };
 
@@ -216,6 +257,22 @@ const uploadError = () => {
   }
 }
 .upload-box {
+  .upload-with-progress {
+    position: relative;
+    width: v-bind(width);
+    height: v-bind(height);
+  }
+  .upload-progress-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: v-bind(borderRadius);
+    background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+    pointer-events: none;
+  }
   .no-border {
     :deep(.el-upload) {
       border: none !important;

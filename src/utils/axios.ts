@@ -223,12 +223,18 @@ class Yu {
   delete<T = Result>(url: string): Promise<T> {
     return this.instance.delete(url);
   }
-  // 图片上传（必须关闭请求节流：FormData 在节流键中无法区分内容，并发多图会误判为同一请求）
-  upload<T = Result>(url: string, formData?: object): Promise<T> {
+  // 图片上传
+  upload<T = Result>(url: string, formData?: object, config?: AxiosRequestConfig): Promise<T> {
+    const extraHeaders =
+      config?.headers && typeof config.headers === "object" && !(config.headers instanceof Headers)
+        ? (config.headers as Record<string, string>)
+        : {};
     return this.instance.post(url, formData, {
+      ...config,
       throttle: false,
       headers: {
-        "Content-Type": "multipart/form-data"
+        "Content-Type": "multipart/form-data",
+        ...extraHeaders
       }
     });
   }

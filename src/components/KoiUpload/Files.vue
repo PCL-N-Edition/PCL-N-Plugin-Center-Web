@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="koi-upload-files-root">
     <!-- 注意：只能通过 on-change 钩子函数来对上传文件的列表进行控制。 -->
     <el-upload
       :file-list="fileList"
@@ -19,13 +19,13 @@
         <span>上传文件</span>
       </div>
     </el-upload>
-    <div style="margin-top: 6px">
+    <div style="margin-top: .375rem">
       <div
-        class="template-file text-#555 m-t-2px rounded-6px dark:text-#CFD3DC hover:bg-[--el-color-primary-light-9]"
+        class="template-file text-#555 m-t-0.125rem rounded-0.375rem dark:text-#CFD3DC hover:bg-[--el-color-primary-light-9]"
         v-for="item in fileList"
         :key="item.url"
       >
-        <el-icon size="16" style="margin-right: 5px"><Link /></el-icon>
+        <el-icon size="16" style="margin-right: .3125rem"><Link /></el-icon>
         <el-tooltip :content="item.name" placement="top">
           <div class="document-name hover:text-[--el-color-primary]">{{ item.name }}</div>
         </el-tooltip>
@@ -35,7 +35,7 @@
         <!-- 默认不显示下载 -->
         <el-icon
           v-if="isDownload"
-          class="p-l-5px hover:text-[--el-color-primary]"
+          class="p-l-0.3125rem hover:text-[--el-color-primary]"
           size="16"
           @click="handleDownLoad(item.url, item.name)"
           ><Download
@@ -45,16 +45,21 @@
     <span class="file-tips">
       <slot name="tip">
         支持{{ acceptTypes }}；
-        <div class="h-1px"></div>
+        <div class="h-0.0625rem"></div>
         文件大小不能超过{{ props.fileSize }}M；最多上传{{ props.limit }}个；
       </slot>
     </span>
+    <transition name="el-fade-in-linear">
+      <div v-if="activeUploadCount > 0" class="koi-upload-files-progress">
+        <el-progress type="circle" :percentage="aggregatedUploadPercent" :width="88" :stroke-width="5" />
+      </div>
+    </transition>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, inject } from "vue";
-import { ElLoading, formContextKey, formItemContextKey } from "element-plus";
+import { ref, computed, watch, inject, onBeforeUnmount } from "vue";
+import { formContextKey, formItemContextKey } from "element-plus";
 import { koiNoticeSuccess, koiNoticeError, koiMsgWarning, koiMsgError } from "@/utils/koi.ts";
 import koi from "@/utils/axios.ts";
 
@@ -102,6 +107,26 @@ let fileList = ref<any>([]);
 // 父组件传递回显数据
 fileList.value = props.fileList;
 
+/** 多选并发上传时按 uid 记进度，遮罩为平均百分比 */
+const activeUploadCount = ref(0);
+const uploadPercentByUid = ref<Record<number, number>>({});
+
+const aggregatedUploadPercent = computed(() => {
+  const vals = Object.values(uploadPercentByUid.value);
+  if (!vals.length) return 0;
+  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+});
+
+/** 当前进行中请求数为 0 时，再一次性提示本批成功总数（避免先完成 1 个就弹出，其余还在传导致分条提示） */
+const batchSuccessCount = ref(0);
+
+const flushPendingSuccessNoticeIfAllDone = () => {
+  if (activeUploadCount.value > 0) return;
+  if (batchSuccessCount.value <= 0) return;
+  koiNoticeSuccess(`文件上传成功，共 ${batchSuccessCount.value} 个`);
+  batchSuccessCount.value = 0;
+};
+
 // 修改进行回显的时候使用
 watch(
   () => [props.fileList],
@@ -145,77 +170,51 @@ const handleChange = async (file: any) => {
     formData.append("fileSize", props.fileSize.toString());
     formData.append("folderName", props.folderName);
     formData.append("fileParam", props.fileParam === "-1" || props.fileParam === "" ? "-1" : props.fileParam);
-    
-    const loadingInstance = ElLoading.service({
-      text: "正在上传",
-      background: "rgba(0,0,0,.2)"
-    });
 
-    // 上传到服务器上面
+    const uid = rawFile.uid;
+    activeUploadCount.value++;
+    uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: 0 };
+
     const requestURL: string = props.action;
 
-    // 文件上传
-    koi
-      .upload(requestURL, formData)
-      .then((res: any) => {
-        loadingInstance.close();
-        let fileMap = res.data;
-        fileList.value.push({
-          name: fileMap.fileName,
-          url: import.meta.env.VITE_SERVER + fileMap.fileUploadPath
-        });
-        emits("update:fileList", fileList.value);
-        emits("fileSuccess", fileMap);
-        // 调用 el-form 内部的校验方法[可自动校验]
-        formItemContext?.prop && formContext?.validateField([formItemContext.prop as string]);
-        koiNoticeSuccess("文件上传成功");
-      })
-      .catch(error => {
-        console.log("文件上传", error);
-        // 移除失败的文件
-        const arr = [...fileList.value];
-        fileList.value = arr.filter((item: any) => {
-          return item.uid != rawFile.uid;
-        });
-        emits("update:fileList", fileList.value);
-        loadingInstance.close();
-        koiNoticeError("上传失败，亲，您的文件不支持上传");
+    try {
+      const res: any = await koi.upload(requestURL, formData, {
+        onUploadProgress: (e: { loaded: number; total?: number }) => {
+          let pct = 0;
+          if (e.total !== undefined && e.total > 0) {
+            pct = Math.min(100, Math.round((e.loaded * 100) / e.total));
+          }
+          uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: pct };
+        }
       });
+      uploadPercentByUid.value = { ...uploadPercentByUid.value, [uid]: 100 };
+      let fileMap = res.data;
+      fileList.value.push({
+        name: fileMap.fileName,
+        url: import.meta.env.VITE_SERVER + fileMap.fileUploadPath
+      });
+      emits("update:fileList", fileList.value);
+      emits("fileSuccess", fileMap);
+      formItemContext?.prop && formContext?.validateField([formItemContext.prop as string]);
+      batchSuccessCount.value += 1;
+    } catch (error) {
+      console.log("文件上传", error);
+      const arr = [...fileList.value];
+      fileList.value = arr.filter((item: any) => {
+        return item.uid != rawFile.uid;
+      });
+      emits("update:fileList", fileList.value);
+      koiNoticeError("上传失败，亲，您的文件不支持上传");
+    } finally {
+      const next = { ...uploadPercentByUid.value };
+      delete next[uid];
+      uploadPercentByUid.value = next;
+      activeUploadCount.value = Math.max(0, activeUploadCount.value - 1);
+      flushPendingSuccessNoticeIfAllDone();
+    }
   }
   return true;
 };
-
-// 校验上传文件格式
-// const getType = (acceptType: string) => {
-//   let val = "";
-//   switch (acceptType) {
-//     case "xls":
-//       val = "excel";
-//       break;
-//     case "doc":
-//       val = "word";
-//       break;
-//     case "pdf":
-//       val = "pdf";
-//       break;
-//     case "zip":
-//       val = "zip";
-//       break;
-//     case "xlsx":
-//       val = "sheet";
-//       break;
-//     case "pptx":
-//       val = "presentation";
-//       break;
-//     case "docx":
-//       val = "document";
-//       break;
-//     case "text":
-//       val = "text";
-//       break;
-//   }
-//   return val;
-// };
 
 // 文件类型映射表
 const fileTypeMap: any = {
@@ -309,39 +308,64 @@ const handleDownLoad = async (url: string, name: string) => {
     koiNoticeError("下载失败，请刷新重试");
   }
 };
+
+onBeforeUnmount(() => {
+  if (batchSuccessCount.value > 0) {
+    koiNoticeSuccess(`文件上传成功，共 ${batchSuccessCount.value} 个`);
+    batchSuccessCount.value = 0;
+  }
+});
 </script>
 
 <style lang="scss" scoped>
+.koi-upload-files-root {
+  position: relative;
+  display: inline-block;
+  min-width: 12.5rem;
+  max-width: 100%;
+}
+.koi-upload-files-progress {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+  pointer-events: none;
+}
 .el-upload-text {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 106px;
-  height: 32px;
+  width: 6.625rem;
+  height: 2rem;
   color: var(--el-color-primary);
 
   /* 设置用户禁止选择 */
   user-select: none;
-  border: 2px dashed var(--el-color-primary);
-  border-radius: 6px;
+  border: .125rem dashed var(--el-color-primary);
+  border-radius: .375rem;
   span {
-    padding-left: 6px;
-    font-size: 14px;
+    padding-left: .375rem;
+    font-size: .875rem;
     font-weight: 500;
   }
 }
 .template-file {
   display: flex;
   align-items: center;
-  height: 18px;
-  border-radius: 4px;
-  padding: 3px 6px;
-  max-width: 360px;
+  height: 1.125rem;
+  border-radius: .25rem;
+  padding: .1875rem .375rem;
+  max-width: 22.5rem;
   .document-name {
-    margin-right: 12px;
-    font-size: 14px;
-    line-height: 16px;
-    height: 16px;
+    margin-right: .75rem;
+    font-size: .875rem;
+    line-height: 1rem;
+    height: 1rem;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -350,7 +374,7 @@ const handleDownLoad = async (url: string, name: string) => {
   }
 }
 .file-tips {
-  font-size: 12px;
+  font-size: .75rem;
   color: var(--el-color-primary);
 }
 </style>
