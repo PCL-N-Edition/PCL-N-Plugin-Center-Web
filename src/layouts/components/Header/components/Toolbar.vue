@@ -1,5 +1,9 @@
 <template>
-  <div class="header-right" ref="toolbarRef">
+  <div
+    class="header-right"
+    :class="{ 'is-header-inverted': isHeaderInverted }"
+    ref="toolbarRef"
+  >
     <!-- 搜索菜单 -->
     <SearchMenu v-show="isCollapsed"></SearchMenu>
     <!-- ElementPlus 尺寸配置 -->
@@ -20,16 +24,18 @@
     <!-- 折叠按钮 -->
     <div class="toolbar-toggle" @click="toggleToolbar">
       <el-icon>
-        <ArrowRight v-if="isCollapsed" />
-        <ArrowLeft v-else />
+        <ArrowLeft v-if="isCollapsed" />
+        <ArrowRight v-else />
       </el-icon>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { storeToRefs } from "pinia";
 import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
+import useGlobalStore from "@/stores/modules/global.ts";
 import User from "@/layouts/components/Header/components/User.vue";
 import FullScreen from "@/layouts/components/Header/components/FullScreen.vue";
 import Dark from "@/layouts/components/Header/components/Dark.vue";
@@ -40,6 +46,11 @@ import Language from "@/layouts/components/Header/components/Language.vue";
 import SearchMenu from "@/layouts/components/Header/components/SearchMenu.vue";
 
 const emit = defineEmits(["widthChange"]);
+
+const globalStore = useGlobalStore();
+const { headerInverted, isDark } = storeToRefs(globalStore);
+/** 头部反转色（仅亮色模式）时使用原有实心样式 */
+const isHeaderInverted = computed(() => headerInverted.value && !isDark.value);
 
 const isCollapsed = ref(true);
 const isSmallScreen = ref(true);
@@ -106,7 +117,41 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   height: 100%;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+
+  html.dark & {
+    background: rgba(30, 30, 30, 0.65);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  /** 头部反转色：恢复原有实心样式，跟随 --el-header-* 主题变量 */
+  &.is-header-inverted {
+    background-color: var(--el-header-bg-color);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid var(--el-header-toolbar-border-color);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+
+    .toolbar-toggle {
+      background: var(--el-header-toolbar-collapse-bg-color);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border: none;
+
+      &:hover {
+        background: var(--el-header-toolbar-collapse-hover-bg-color);
+        border-color: transparent;
+      }
+    }
+  }
 
   .toolbar-toggle {
     display: flex;
@@ -117,12 +162,21 @@ onUnmounted(() => {
     margin-left: 8px;
     color: var(--el-color-primary);
     cursor: pointer;
-    background: var(--el-header-toolbar-collapse-bg-color);
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(8px) saturate(160%);
+    -webkit-backdrop-filter: blur(8px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     border-radius: 50%;
     transition: all 0.3s ease;
 
+    html.dark & {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
     &:hover {
-      background: var(--el-header-toolbar-collapse-hover-bg-color);
+      background: rgba(var(--el-color-primary-rgb), 0.18);
+      border-color: var(--el-color-primary-light-5);
       transform: scale(1.05);
     }
 

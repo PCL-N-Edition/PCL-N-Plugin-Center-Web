@@ -4,7 +4,7 @@
       <!-- 左侧菜单展开和折叠图标 -->
       <Collapse></Collapse>
       <!-- 面包屑 -->
-      <BreadCrumb class="<md:hidden"></BreadCrumb>
+      <BreadCrumb v-if="showBreadCrumb" class="<md:hidden"></BreadCrumb>
     </div>
     <!-- 工具栏 -->
     <Toolbar></Toolbar>
@@ -15,6 +15,14 @@
 import Collapse from "@/layouts/components/Header/components/Collapse.vue";
 import BreadCrumb from "@/layouts/components/Header/components/BreadCrumb.vue";
 import Toolbar from "@/layouts/components/Header/components/Toolbar.vue";
+
+withDefaults(
+  defineProps<{
+    /** 渐变布局等在主内容区展示面包屑时传 false，避免与折叠按钮同一行 */
+    showBreadCrumb?: boolean;
+  }>(),
+  { showBreadCrumb: true }
+);
 </script>
 
 <style lang="scss" scoped>
@@ -34,25 +42,14 @@ import Toolbar from "@/layouts/components/Header/components/Toolbar.vue";
     z-index: 1; /* 确保在 Toolbar 下方 */
   }
 
-  /* 让 Toolbar 覆盖在 header-left 上方 */
+  /* 让 Toolbar 覆盖在 header-left 上方（毛玻璃样式由 Toolbar 组件自身提供） */
   :deep(.header-right) {
     position: absolute;
     top: 50%;
     right: 0px;
-    z-index: 10; /* 确保在 header-left 上方 */
+    z-index: 10;
     height: 40px;
     transform: translateY(-50%);
-    padding: 2px 6px;
-    // background: var(--el-bg-color);
-    background-color: var(--el-header-bg-color); /* 添加背景色确保覆盖效果 */
-    border: 1px solid var(--el-header-toolbar-border-color); /* 添加边框 */
-    border-radius: 20px; /* 圆角卡片效果 */
-    box-shadow: 0 4px 12px rgb(0 0 0 / 15%); /* 明亮模式阴影效果 */
-
-    /* 黑夜模式阴影效果 */
-    html.dark & {
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); /* 白色阴影，在黑夜模式下更明显 */
-    }
   }
 }
 </style>
