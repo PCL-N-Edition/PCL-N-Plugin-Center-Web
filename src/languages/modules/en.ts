@@ -311,6 +311,7 @@ export default {
   tabs: {
     refresh: "Refresh",
     maximize: "Maximize",
+    exitMaximize: "Exit Maximize",
     closeCurrent: "Close Current",
     closeLeft: "Close Left",
     closeRight: "Close Right",

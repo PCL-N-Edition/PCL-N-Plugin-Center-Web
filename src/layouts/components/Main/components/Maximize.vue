@@ -1,17 +1,30 @@
 <template>
   <!-- 挂到 body：避免嵌入式布局外壳 backdrop-filter / overflow 导致 fixed 被裁剪或非视口参照 -->
   <Teleport to="body">
-    <div
-      v-if="globalStore.maximize"
-      class="layout-main-maximize-exit"
-      @click="handleExitMaximize"
-    >
-      <el-icon :size="22" class="exit-icon"><Close /></el-icon>
-    </div>
+    <transition name="maximize-exit-fade">
+      <el-tooltip
+        v-if="globalStore.maximize"
+        :content="$t('tabs.exitMaximize')"
+        placement="left"
+        :show-after="400"
+      >
+        <button
+          type="button"
+          class="layout-main-maximize-exit"
+          :aria-label="$t('tabs.exitMaximize')"
+          @click="handleExitMaximize"
+        >
+          <el-icon :size="14" class="exit-icon">
+            <Close />
+          </el-icon>
+        </button>
+      </el-tooltip>
+    </transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
+import { Close } from "@element-plus/icons-vue";
 import useGlobalStore from "@/stores/modules/global.ts";
 
 const globalStore = useGlobalStore();
@@ -24,34 +37,38 @@ const handleExitMaximize = () => {
 <style lang="scss" scoped>
 .layout-main-maximize-exit {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: 10px;
+  right: 10px;
   z-index: 10050;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.55);
+  @apply backdrop-blur-[12px] backdrop-saturate-[180%];
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  outline: none;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 
   html.dark & {
-    background: rgba(30, 30, 30, 0.72);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    background: rgba(30, 30, 30, 0.65);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   }
 
   &:hover {
     background: rgba(255, 255, 255, 0.82);
     border-color: var(--el-color-primary-light-5);
-    box-shadow: 0 8px 28px rgba(var(--el-color-primary-rgb), 0.22);
-    transform: translateY(-2px);
+    box-shadow: 0 2px 10px rgba(var(--el-color-primary-rgb), 0.18);
 
     html.dark & {
       background: rgba(40, 40, 40, 0.82);
@@ -64,13 +81,28 @@ const handleExitMaximize = () => {
   }
 
   &:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 16px rgba(var(--el-color-primary-rgb), 0.15);
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    border-color: var(--el-color-primary);
+    box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
   }
 
   .exit-icon {
     color: var(--el-text-color-regular);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, transform 0.3s ease;
   }
+}
+
+.maximize-exit-fade-enter-active,
+.maximize-exit-fade-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.maximize-exit-fade-enter-from,
+.maximize-exit-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.92);
 }
 </style>

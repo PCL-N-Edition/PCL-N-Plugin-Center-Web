@@ -310,6 +310,7 @@ export default {
   tabs: {
     refresh: "重新刷新",
     maximize: "全屏切换",
+    exitMaximize: "退出全屏",
     closeCurrent: "关闭当前",
     closeLeft: "关闭左侧",
     closeRight: "关闭右侧",

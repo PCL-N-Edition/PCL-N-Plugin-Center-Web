@@ -1,13 +1,13 @@
 <template>
   <div class="tabs-card">
     <div @click="handleRefresh()" class="tab-menu-item">
-      <el-icon size="16" class="m-r-5px"><Refresh class="icon-bounce" /></el-icon>{{ $t("tabs.refresh") }}
+      <el-icon size="17" class="m-r-5px"><Refresh class="icon-bounce" /></el-icon>{{ $t("tabs.refresh") }}
     </div>
     <div @click="handleMaximize()" class="tab-menu-item">
-      <el-icon size="16" class="m-r-5px"><FullScreen class="icon-bounce" /></el-icon>{{ $t("tabs.maximize") }}
+      <el-icon size="15" class="m-r-5px"><FullScreen class="icon-bounce" /></el-icon>{{ $t("tabs.maximize") }}
     </div>
     <div @click="handleCloseCurrentTab()" class="tab-menu-item" v-if="(isCurrent || isAlone) && !isAffixed">
-      <el-icon size="16" class="m-r-5px"><Close class="icon-bounce" /></el-icon>{{ $t("tabs.closeCurrent") }}
+      <el-icon size="17" class="m-r-5px"><Close class="icon-bounce" /></el-icon>{{ $t("tabs.closeCurrent") }}
     </div>
     <div @click="handleCloseOtherTabs()" class="tab-menu-item" v-if="hasLeft || hasRight">
       <el-icon size="16" class="m-r-5px"><Switch class="icon-bounce" /></el-icon>{{ $t("tabs.closeOther") }}
