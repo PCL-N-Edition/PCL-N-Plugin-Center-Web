@@ -16,6 +16,7 @@ import router from "@/routers/index.ts";
 import i18n from "@/languages/index.ts";
 import { ElMessageBox } from "element-plus";
 import { createThrottleAdapter } from "@/utils/axiosThrottle.ts";
+import { getBusinessStatus, isUnauthorizedResponse } from "@/utils/axios.ts";
 
 // axios配置[不含加密版本]
 const config = {
@@ -24,12 +25,18 @@ const config = {
   adapter: createThrottleAdapter(),
   timeout: 12000
 };
-// 返回值类型
+
+/**
+ * 统一响应体，与后端保持一致
+ */
 export interface Result<T = any> {
-  code: number;
+  /** 业务状态码：200 成功，401 未授权等 */
+  status: number;
   msg: string;
-  data: T;
-  trackId: string;
+  data?: T;
+  /** 数据类型：NORMAL 明文；10/20 等为加密响应 */
+  dataType?: string;
+  traceId?: string;
 }
 
 // 401 提示框显示标志，防止多个 401 请求同时弹出多个提示框
@@ -75,7 +82,6 @@ function handle401Unauthorized(data: any) {
             const userStore = useUserStore();
             userStore.setToken("");
             koiMsgError(i18n.global.t("msg.confirmLogin"));
-            isShowing401MessageBox = false;
             reject(i18n.global.t("button.confirm"));
             setTimeout(() => {
               router.replace(LOGIN_URL).catch(err => {
@@ -86,8 +92,10 @@ function handle401Unauthorized(data: any) {
           })
           .catch(() => {
             koiNoticeWarning(i18n.global.t("msg.cancelled"));
-            isShowing401MessageBox = false;
             reject(i18n.global.t("msg.cancelled"));
+          })
+          .finally(() => {
+            isShowing401MessageBox = false;
           });
       }, 100); // 延迟 100ms 确保其他操作完成
     });
@@ -128,13 +136,12 @@ class Yu {
     this.instance.interceptors.response.use(
       (res: AxiosResponse) => {
         // console.log("服务器状态", res.status);
-        // 这里的后端可能是code OR status 和 msg OR message需要看后端传递的是什么？
-        const status = res.data.status || res.data.code; // 后端返回数据状态
-        if (status == 200) {
+        const businessStatus = getBusinessStatus(res.data);
+        if (businessStatus === 200) {
           return res.data;
-        } else if (status == 401) {
-          // 处理业务状态码 401
-          return handle401Unauthorized(res?.data);
+        }
+        if (businessStatus === 401) {
+          return handle401Unauthorized(res.data);
         } else {
           // console.log("后端返回数据：", res.data.msg)
           koiNoticeError(res.data.msg + "" || "服务器偷偷跑到火星去玩了");
@@ -146,13 +153,17 @@ class Yu {
         // console.log("进入错误", error);
         error.data = {};
         if (error && error.response) {
+          const responseData = error.response.data;
+          if (isUnauthorizedResponse(responseData, error.response.status)) {
+            return handle401Unauthorized(
+              typeof responseData === "object" && responseData !== null
+                ? responseData
+                : { code: 401, msg: "未授权，请重新登录" }
+            );
+          }
           switch (error.response.status) {
             case 400:
               error.data.msg = "错误请求";
-              koiNoticeError(error.data.msg);
-              break;
-            case 401:
-              error.data.msg = "未授权，请重新登录";
               koiNoticeError(error.data.msg);
               break;
             case 403:
