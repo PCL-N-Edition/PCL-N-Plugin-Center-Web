@@ -1,13 +1,29 @@
 <template>
   <el-container class="layout-container">
     <el-header class="layout-header flex flex-items-center flex-justify-between">
-      <div class="w-30px flex flex-items-center">
-        <KoiSvgIcon name="koi-mobile-menu" width="22" height="22" @click="handleOpenMobileMenu"></KoiSvgIcon>
+      <div class="layout-mobile-header-brand flex flex-items-center">
+        <div v-show="showLogo" class="flex flex-items-center" @click="handleOpenMobileMenu">
+          <el-image :src="logoUrl" fit="cover" class="layout-mobile-header-logo-img">
+            <template #error>
+              <el-icon class="layout-mobile-header-logo-img text-[--el-color-primary]" :size="32">
+                <CircleCloseFilled />
+              </el-icon>
+            </template>
+          </el-image>
+        </div>
+        <div class="layout-mobile-header-menu-group flex flex-items-center">
+          <span class="layout-mobile-header-divider" aria-hidden="true" />
+          <div
+            class="layout-mobile-menu-trigger hover:bg-[--el-header-icon-hover-bg-color] w-36px h-36px rounded-md flex flex-justify-center flex-items-center"
+            @click="handleOpenMobileMenu"
+          >
+            <KoiSvgIcon name="koi-align-left" width="19" height="19" />
+          </div>
+        </div>
       </div>
-      <div class="flex flex-items-center h-100%">
-        <!-- 明亮/暗黑模式图标 -->
+      <div class="layout-mobile-header-actions flex flex-items-center h-100%">
         <Dark></Dark>
-        <!-- 头像 AND 下拉折叠 -->
+        <span class="layout-mobile-header-divider" aria-hidden="true" />
         <User></User>
       </div>
     </el-header>
@@ -47,6 +63,8 @@
 
 <script setup lang="ts">
 import settings from "@/settings.ts";
+import logoUrl from "@/assets/images/logo/logo.webp";
+import { CircleCloseFilled } from "@element-plus/icons-vue";
 import User from "@/layouts/components/Header/components/User.vue";
 import Dark from "@/layouts/components/Header/components/Dark.vue";
 import Logo from "@/layouts/components/Logo/index.vue";
@@ -62,6 +80,7 @@ const authStore = useAuthStore();
 const globalStore = useGlobalStore();
 
 const mobileDrawerVisible = ref(false);
+const showLogo = settings.logoShow;
 
 const handleOpenMobileMenu = () => {
   mobileDrawerVisible.value = true;
@@ -126,6 +145,39 @@ const activeMenu = computed(() => (route.meta.activeMenu ? route.meta.activeMenu
   max-width: 100%;
   box-sizing: border-box;
 }
+.layout-mobile-header-brand {
+  gap: 10px;
+  min-width: 0;
+}
+
+.layout-mobile-header-menu-group {
+  gap: 4px;
+}
+
+.layout-mobile-header-actions {
+  gap: 4px;
+}
+
+.layout-mobile-menu-trigger {
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.layout-mobile-header-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  background-color: var(--el-border-color);
+}
+
+.layout-mobile-header-logo-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: block;
+}
+
 .layout-container {
   width: 100vw;
   height: 100vh;
