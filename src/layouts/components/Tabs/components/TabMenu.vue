@@ -1,30 +1,35 @@
 <template>
-  <div class="tabs-card">
-    <div @click="handleRefresh()" class="tab-menu-item">
-      <el-icon size="17" class="m-r-5px"><Refresh class="icon-bounce" /></el-icon>{{ $t("tabs.refresh") }}
-    </div>
-    <div @click="handleMaximize()" class="tab-menu-item">
-      <el-icon size="15" class="m-r-5px"><FullScreen class="icon-bounce" /></el-icon>{{ $t("tabs.maximize") }}
-    </div>
-    <div @click="handleCloseCurrentTab()" class="tab-menu-item" v-if="(isCurrent || isAlone) && !isAffixed">
-      <el-icon size="17" class="m-r-5px"><Close class="icon-bounce" /></el-icon>{{ $t("tabs.closeCurrent") }}
-    </div>
-    <div @click="handleCloseOtherTabs()" class="tab-menu-item" v-if="hasLeft || hasRight">
-      <el-icon size="16" class="m-r-5px"><Switch class="icon-bounce" /></el-icon>{{ $t("tabs.closeOther") }}
-    </div>
-    <div @click="handleCloseSideTabs('left')" class="tab-menu-item" v-if="hasLeft">
-      <el-icon size="16" class="m-r-5px"><DArrowLeft class="icon-bounce" /></el-icon>{{ $t("tabs.closeLeft") }}
-    </div>
-    <div @click="handleCloseSideTabs('right')" class="tab-menu-item" v-if="hasRight">
-      <el-icon size="16" class="m-r-5px"><DArrowRight class="icon-bounce" /></el-icon>{{ $t("tabs.closeRight") }}
-    </div>
-    <div icon="Remove" @click="handleCloseAllTabs()" class="tab-menu-item" v-if="isAlone">
-      <el-icon size="16" class="m-r-5px"><Remove class="icon-bounce" /></el-icon>{{ $t("tabs.closeAll") }}
-    </div>  
-    <div @click="handleAffixTab()" class="tab-menu-item" v-if="handleShowAffix">
-      <KoiSvgIcon :name="isAffixed ? 'koi-unpinned' : 'koi-pinned'" class="m-r-5px icon-bounce"></KoiSvgIcon>
-      {{ isAffixed ? $t("tabs.unaffix") : $t("tabs.affix") }}
-    </div>
+  <!-- 挂到 body：渐变布局 .grad-sheet 等含 backdrop-filter 时，内部 fixed 会相对该层而非视口，导致 clientX/Y 与菜单位置错位 -->
+  <div class="tab-menu-anchor" aria-hidden="true">
+    <Teleport to="body">
+      <div ref="menuCardRef" class="tabs-card">
+        <div @click="handleRefresh()" class="tab-menu-item">
+          <el-icon size="17" class="m-r-5px"><Refresh class="icon-bounce" /></el-icon>{{ $t("tabs.refresh") }}
+        </div>
+        <div @click="handleMaximize()" class="tab-menu-item">
+          <el-icon size="15" class="m-r-5px"><FullScreen class="icon-bounce" /></el-icon>{{ $t("tabs.maximize") }}
+        </div>
+        <div @click="handleCloseCurrentTab()" class="tab-menu-item" v-if="(isCurrent || isAlone) && !isAffixed">
+          <el-icon size="17" class="m-r-5px"><Close class="icon-bounce" /></el-icon>{{ $t("tabs.closeCurrent") }}
+        </div>
+        <div @click="handleCloseOtherTabs()" class="tab-menu-item" v-if="hasLeft || hasRight">
+          <el-icon size="16" class="m-r-5px"><Switch class="icon-bounce" /></el-icon>{{ $t("tabs.closeOther") }}
+        </div>
+        <div @click="handleCloseSideTabs('left')" class="tab-menu-item" v-if="hasLeft">
+          <el-icon size="16" class="m-r-5px"><DArrowLeft class="icon-bounce" /></el-icon>{{ $t("tabs.closeLeft") }}
+        </div>
+        <div @click="handleCloseSideTabs('right')" class="tab-menu-item" v-if="hasRight">
+          <el-icon size="16" class="m-r-5px"><DArrowRight class="icon-bounce" /></el-icon>{{ $t("tabs.closeRight") }}
+        </div>
+        <div icon="Remove" @click="handleCloseAllTabs()" class="tab-menu-item" v-if="isAlone">
+          <el-icon size="16" class="m-r-5px"><Remove class="icon-bounce" /></el-icon>{{ $t("tabs.closeAll") }}
+        </div>
+        <div @click="handleAffixTab()" class="tab-menu-item" v-if="handleShowAffix">
+          <KoiSvgIcon :name="isAffixed ? 'koi-unpinned' : 'koi-pinned'" class="m-r-5px icon-bounce"></KoiSvgIcon>
+          {{ isAffixed ? $t("tabs.unaffix") : $t("tabs.affix") }}
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -44,6 +49,7 @@ const tabsStore = useTabsStore();
 const globalStore = useGlobalStore();
 
 // 点击鼠标右键点击出现菜单
+const menuCardRef = ref<HTMLElement | null>(null);
 const choosePath = ref();
 
 const isCurrent = ref();
@@ -64,91 +70,116 @@ const handleShowAffix = computed(() => {
   return choosePath.value && choosePath.value !== HOME_URL;
 });
 
+/** 菜单与视口边缘的最小留白（px） */
+const MENU_VIEWPORT_PADDING = 12;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 /**
- * 计算菜单位置，避免超出视口边界
+ * 计算菜单位置，避免贴边时被挤压或裁切（viewport + fixed）
  * @param card - 菜单元素
- * @param pageX - 鼠标X坐标
- * @param pageY - 鼠标Y坐标
+ * @param clientX - 鼠标 X（视口）
+ * @param clientY - 鼠标 Y（视口）
  */
-const calculateMenuPosition = (card: HTMLElement, pageX: number, pageY: number) => {
-  // 临时禁用 transition，避免位置变化时的动画
+const calculateMenuPosition = (card: HTMLElement, clientX: number, clientY: number) => {
   const originalTransition = card.style.transition;
   card.style.transition = "none";
-  
-  // 移除动画 class，以便下次出现时重新触发
   card.classList.remove("menu-appear");
-  
-  // 先显示菜单以获取其尺寸
-  card.style.display = "block";
-  const menuWidth = card.offsetWidth;
-  const menuHeight = card.offsetHeight;
-  
-  // 获取视口尺寸和滚动位置
+
+  const pad = MENU_VIEWPORT_PADDING;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-  const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-  
-  // 计算菜单最终位置（考虑滚动）
-  let left = pageX;
-  let top = pageY;
-  
-  // 检查右边界：如果菜单会超出右边界，则显示在鼠标左侧
-  if (pageX + menuWidth > scrollX + viewportWidth) {
-    left = pageX - menuWidth;
+  const maxMenuWidth = Math.max(160, viewportWidth - pad * 2);
+
+  card.style.display = "block";
+  card.style.visibility = "hidden";
+  card.style.maxWidth = `${maxMenuWidth}px`;
+  card.style.left = "0";
+  card.style.top = "0";
+
+  let menuWidth = card.offsetWidth;
+  let menuHeight = card.offsetHeight;
+
+  let left = clientX;
+  let top = clientY;
+
+  if (left + menuWidth > viewportWidth - pad) {
+    left = clientX - menuWidth;
   }
-  
-  // 检查左边界：确保菜单不会超出左边界
-  if (left < scrollX) {
-    left = scrollX + 5; // 留5px边距
+  left = clamp(left, pad, Math.max(pad, viewportWidth - menuWidth - pad));
+
+  if (top + menuHeight > viewportHeight - pad) {
+    top = clientY - menuHeight;
   }
-  
-  // 检查下边界：如果菜单会超出下边界，则显示在鼠标上方
-  if (pageY + menuHeight > scrollY + viewportHeight) {
-    top = pageY - menuHeight;
+  top = clamp(top, pad, Math.max(pad, viewportHeight - menuHeight - pad));
+
+  if (menuWidth > viewportWidth - pad * 2) {
+    card.style.maxWidth = `${viewportWidth - pad * 2}px`;
+    menuWidth = card.offsetWidth;
+    menuHeight = card.offsetHeight;
+    left = clamp(clientX, pad, viewportWidth - menuWidth - pad);
+    top = clamp(top, pad, viewportHeight - menuHeight - pad);
   }
-  
-  // 检查上边界：确保菜单不会超出上边界
-  if (top < scrollY) {
-    top = scrollY + 5; // 留5px边距
-  }
-  
-  // 设置位置
-  card.style.left = left + "px";
-  card.style.top = top + "px";
-  
-  // 在下一帧恢复 transition 并触发出现动画
+
+  const originX = clientX <= left + menuWidth * 0.35 ? "left" : clientX >= left + menuWidth * 0.65 ? "right" : "center";
+  const originY = clientY <= top + menuHeight * 0.35 ? "top" : clientY >= top + menuHeight * 0.65 ? "bottom" : "center";
+
+  card.style.visibility = "";
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+  card.style.transformOrigin = `${originX} ${originY}`;
+
   requestAnimationFrame(() => {
     card.style.transition = originalTransition || "";
-    // 触发出现动画
     card.classList.add("menu-appear");
   });
-  
+
   return { left, top };
 };
 
-/** 处理鼠标右键点击父级菜单 */
-const handleKoiMenuParent = (e: any) => {
-  const tabList = tabsStore.tabList;
+/** 从右键事件目标解析当前标签 path（手写标签 / 兼容旧 el-tabs id） */
+const resolveContextTabPath = (e: MouseEvent): string | null => {
+  const target = e.target as HTMLElement | null;
+  if (!target) return null;
 
-  if (e.srcElement?.id) {
-    choosePath.value = e.srcElement.id.split("-")[1];
-    const tabsMenu = getMenuPositionAndClosable(tabList, choosePath.value);
-    isCurrent.value = tabsMenu?.isClosable;
-    isAlone.value = tabsMenu?.isAlone;
-    hasLeft.value = tabsMenu?.hasLeft;
-    hasRight.value = tabsMenu?.hasRight;
-  } else {
-    return;
+  const tabEl = target.closest(".layout-tabs-bar__item") as HTMLElement | null;
+  if (tabEl) {
+    const pathAttr = tabEl.dataset.tabPath;
+    if (pathAttr) return pathAttr;
+    const idx = tabEl.dataset.tabIndex;
+    if (idx !== undefined) {
+      const tab = tabsStore.tabList[Number(idx)];
+      if (tab?.path) return tab.path;
+    }
   }
 
-  const card = document.querySelector(".tabs-card") as HTMLElement | null;
+  const legacyEl = target.closest("[id^='tab-']") as HTMLElement | null;
+  const legacyId = legacyEl?.id ?? target.id;
+  if (legacyId?.startsWith("tab-")) {
+    return legacyId.slice(4);
+  }
 
-  // 阻止默认右键菜单
+  return route.fullPath;
+};
+
+/** 处理鼠标右键点击父级菜单（标签空白区：默认当前路由对应标签） */
+const handleKoiMenuParent = (e: MouseEvent) => {
+  const tabList = tabsStore.tabList;
+  const path = resolveContextTabPath(e);
+  if (!path) return;
+
+  choosePath.value = path;
+  const tabsMenu = getMenuPositionAndClosable(tabList, path);
+  isCurrent.value = tabsMenu?.isClosable;
+  isAlone.value = tabsMenu?.isAlone;
+  hasLeft.value = tabsMenu?.hasLeft;
+  hasRight.value = tabsMenu?.hasRight;
+
+  const card = menuCardRef.value;
+
   e.preventDefault();
   if (card != null) {
-    // 计算并设置 card 的位置，避免超出视口边界
-    calculateMenuPosition(card, e.pageX, e.pageY);
+    calculateMenuPosition(card, e.clientX, e.clientY);
 
     // 点击数据时，菜单消失
     const hideCard = () => {
@@ -174,10 +205,10 @@ const handleKoiMenuParent = (e: any) => {
 };
 
 /** 处理鼠标右键点击子级菜单 */
-const handleKoiMenuChildren = (path: any, e: any) => {
+const handleKoiMenuChildren = (path: string, e: MouseEvent) => {
   const tabList = tabsStore.tabList;
   choosePath.value = path;
-  const card = document.querySelector(".tabs-card") as HTMLElement | null;
+  const card = menuCardRef.value;
 
   // 阻止默认右键菜单
   e.preventDefault();
@@ -187,8 +218,7 @@ const handleKoiMenuChildren = (path: any, e: any) => {
     isAlone.value = tabsMenu?.isAlone;
     hasLeft.value = tabsMenu?.hasLeft;
     hasRight.value = tabsMenu?.hasRight;
-    // 计算并设置 card 的位置，避免超出视口边界
-    calculateMenuPosition(card, e.pageX, e.pageY);
+    calculateMenuPosition(card, e.clientX, e.clientY);
 
     // 点击数据时，菜单消失
     const hideCard = () => {
@@ -330,11 +360,23 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+.tab-menu-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
 /** 右键点击选项开始 */
 .tabs-card {
-  position: absolute;
-  z-index: 9999;
+  pointer-events: auto;
+  position: fixed;
+  z-index: 10050;
   display: none;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 24px);
   padding: 4px;
   color: var(--el-text-color-primary);
   cursor: pointer;
@@ -343,12 +385,11 @@ defineExpose({
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
   backdrop-filter: blur(10px);
-  /* 只对背景色、边框、阴影等应用过渡，不包括位置属性 */
+  white-space: nowrap;
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-  /* 初始状态：透明且缩放为0 */
   opacity: 0;
   transform: scale(0.8);
-  transform-origin: center;
+  transform-origin: top left;
   
   /* 出现动画 */
   &.menu-appear {
@@ -370,8 +411,10 @@ defineExpose({
 .tab-menu-item {
   display: flex;
   align-items: center;
-  width: auto;
+  width: max-content;
+  min-width: 100%;
   height: 32px;
+  white-space: nowrap;
   padding: 8px 12px;
   margin: 2px 0;
   font-size: var(--el-font-size-base);

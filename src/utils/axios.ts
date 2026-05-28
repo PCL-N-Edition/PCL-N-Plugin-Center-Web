@@ -16,7 +16,6 @@ import router from "@/routers/index.ts";
 import i18n from "@/languages/index.ts";
 import { ElMessageBox } from "element-plus";
 import { createThrottleAdapter } from "@/utils/axiosThrottle.ts";
-import { getBusinessStatus, isUnauthorizedResponse } from "@/utils/axios.ts";
 
 // axios配置[不含加密版本]
 const config = {
@@ -41,6 +40,32 @@ export interface Result<T = any> {
 
 // 401 提示框显示标志，防止多个 401 请求同时弹出多个提示框
 let isShowing401MessageBox = false;
+
+/**
+ * 解析响应体中的业务状态码（兼容 status / code，且任一为 401 时优先视为未授权）
+ */
+export function getBusinessStatus(data: any): number | undefined {
+  if (data == null || typeof data !== "object") {
+    return undefined;
+  }
+  if (Number(data.status) === 401 || Number(data.code) === 401) {
+    return 401;
+  }
+  const raw = data.status ?? data.code;
+  if (raw === undefined || raw === null || raw === "") {
+    return undefined;
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** 是否为未授权响应（业务体或 HTTP 401） */
+export function isUnauthorizedResponse(data: any, httpStatus?: number): boolean {
+  if (httpStatus === 401) {
+    return true;
+  }
+  return getBusinessStatus(data) === 401;
+}
 
 /**
  * 统一处理 401 未授权情况

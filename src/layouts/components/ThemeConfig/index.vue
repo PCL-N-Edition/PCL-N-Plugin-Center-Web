@@ -112,8 +112,9 @@
             <div class="config-item">
               <div class="config-label">标签页风格</div>
               <el-select placeholder="请选择标签页风格" v-model="tabsStyle" clearable class="config-input">
+                <el-option label="标签风格" value="card" />
                 <el-option label="谷歌风格" value="google" />
-                <el-option label="卡片风格" value="card" />
+                <el-option label="简约风格" value="plain" />
               </el-select>
             </div>
 

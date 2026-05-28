@@ -2,23 +2,25 @@
   <!-- 挂到 body：避免嵌入式布局外壳 backdrop-filter / overflow 导致 fixed 被裁剪或非视口参照 -->
   <Teleport to="body">
     <transition name="maximize-exit-fade">
-      <el-tooltip
-        v-if="globalStore.maximize"
-        :content="$t('tabs.exitMaximize')"
-        placement="left"
-        :show-after="400"
-      >
-        <button
-          type="button"
-          class="layout-main-maximize-exit"
-          :aria-label="$t('tabs.exitMaximize')"
-          @click="handleExitMaximize"
+      <!-- Transition 需要单一真实 DOM 根节点，不可直接包 el-tooltip（其根为碎片节点） -->
+      <div v-if="globalStore.maximize" class="layout-main-maximize-exit-wrap">
+        <el-tooltip
+          :content="$t('tabs.exitMaximize')"
+          placement="left"
+          :show-after="400"
         >
-          <el-icon :size="14" class="exit-icon">
-            <Close />
-          </el-icon>
-        </button>
-      </el-tooltip>
+          <button
+            type="button"
+            class="layout-main-maximize-exit"
+            :aria-label="$t('tabs.exitMaximize')"
+            @click="handleExitMaximize"
+          >
+            <el-icon :size="14" class="exit-icon">
+              <Close />
+            </el-icon>
+          </button>
+        </el-tooltip>
+      </div>
     </transition>
   </Teleport>
 </template>
@@ -35,11 +37,14 @@ const handleExitMaximize = () => {
 </script>
 
 <style lang="scss" scoped>
-.layout-main-maximize-exit {
+.layout-main-maximize-exit-wrap {
   position: fixed;
   top: 10px;
   right: 10px;
   z-index: 10050;
+}
+
+.layout-main-maximize-exit {
   display: flex;
   align-items: center;
   justify-content: center;

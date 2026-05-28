@@ -33,7 +33,7 @@ const globalStore = defineStore("global", {
       themeColor: DEFAULT_THEME,
       // 布局模式 (纵向：vertical | 经典：classic | 横向：horizontal | 分栏：column)
       layout: "vertical",
-      // 标签页风格
+      // 标签页风格[谷歌风格：google | 卡片风格：card | 简约风格：plain]
       tabsStyle: "google",
       // 路由动画
       transition: "fade-default",
