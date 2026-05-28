@@ -125,6 +125,7 @@ import { useRouter } from "vue-router";
 // import { koiLogin, getCaptcha } from "@/api/system/login/index.ts";
 import authLogin from "@/assets/json/authLogin.json";
 import useUserStore from "@/stores/modules/user.ts";
+import useAuthStore from "@/stores/modules/auth.ts";
 import useKeepAliveStore from "@/stores/modules/keepAlive.ts";
 import { HOME_URL, LOGIN_URL } from "@/config/index.ts";
 import { initDynamicRouter } from "@/routers/modules/dynamicRouter.ts";
@@ -140,6 +141,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const userStore = useUserStore();
+const authStore = useAuthStore();
 const tabsStore = useTabsStore();
 const keepAliveStore = useKeepAliveStore();
 const router = useRouter();
@@ -245,6 +247,7 @@ const handleKoiLogin = () => {
     if (valid) {
       try {
         loading.value = true;
+        authStore.$reset();
         resetRouter();
         // 1、执行登录接口
         // const res: any = await koiLogin({ loginName, password, codeKey, securityCode });
@@ -253,7 +256,11 @@ const handleKoiLogin = () => {
 
         // 2、添加动态路由 AND 用户按钮 AND 角色信息 AND 用户个人信息
         if (userStore?.token) {
-            await initDynamicRouter(); // 等待 initDynamicRouter 完成
+          try {
+            await initDynamicRouter();
+          } catch {
+            return;
+          }
         } else {
           koiMsgWarning(t("msg.logIn"));
           router.replace(LOGIN_URL);

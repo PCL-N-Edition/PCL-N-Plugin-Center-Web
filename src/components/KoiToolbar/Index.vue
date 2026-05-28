@@ -5,17 +5,17 @@
     <el-row class="koi-toolbar-row">
       <el-tooltip :content="showSearch ? $t('button.hideSearch') : $t('button.displaySearch') " placement="top">
         <button type="button" class="koi-toolbar-btn" @click="toggleSearch()">
-          <el-icon><Search /></el-icon>
+          <el-icon size="17"><Search /></el-icon>
         </button>
       </el-tooltip>
       <el-tooltip :content="$t('button.refresh')" placement="top">
         <button type="button" class="koi-toolbar-btn" @click="handleRefresh()">
-          <el-icon><RefreshRight /></el-icon>
+          <el-icon size="18"><RefreshRight /></el-icon>
         </button>
       </el-tooltip>
       <button v-if="showMaximize" type="button" class="koi-toolbar-btn" @click="handleMaximize()">
         <el-icon v-if="!isMaximize"><FullScreen /></el-icon>
-        <el-icon v-else><Aim /></el-icon>
+        <KoiGlobalIcon name="koi-fullscreen-exit" size="18" v-else></KoiGlobalIcon>
       </button>
     </el-row>
   </div>
@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick } from "vue";
-import { FullScreen, Aim, Search, RefreshRight } from "@element-plus/icons-vue";
+import { FullScreen, Search, RefreshRight } from "@element-plus/icons-vue";
 import useGlobalStore from "@/stores/modules/global.ts";
 
 interface IToolbarProps {

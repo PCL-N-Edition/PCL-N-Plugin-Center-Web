@@ -8,7 +8,7 @@ import { LOGIN_URL, ROUTER_WHITE_LIST } from "@/config/index.ts";
 import { koiMsgWarning } from "@/utils/koi.ts";
 import { ElMessageBox } from 'element-plus';
 import { useDebounceFn } from '@vueuse/core';
-import { initDynamicRouter } from "@/routers/modules/dynamicRouter.ts";
+import { initDynamicRouter, isDynamicRoutesMissing } from "@/routers/modules/dynamicRouter.ts";
 import { getMenuLanguage, isPathMatch } from "@/utils/index.ts";
 import i18n from '@/languages/index.ts';
 
@@ -72,13 +72,18 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
     return { path: LOGIN_URL, replace: true }; // 重定向到登录页
   }
 
-  // 6、如果没有菜单列表[一级扁平化路由 OR 递归菜单路由数据判断是否存在都阔以]，就重新请求菜单列表并添加动态路由。
-  if (!authStore.getMenuList.length) {
-    // 注意：authStore.getMenuList，不能持久化菜单数据，否则这里一直有值，就不会走这里，而且持久化之后还会被篡改数据。
-    // 获取相关菜单数据 && 按钮数据 && 角色数据[to.meta.roles获取角色信息进行判断] && 用户信息。
-    await initDynamicRouter();
-    // ...to 保证路由添加完了再进入页面 (可以理解为重进一次) replace: true 重进一次, 不保留重复历史
-    return { ...to, replace: true };
+  // 6、无菜单数据，或菜单在 store 中但路由未注册（如 resetRouter 后），需重新拉取/注册动态路由
+  const menuList = authStore.getMenuList;
+  if (!menuList.length || isDynamicRoutesMissing(menuList)) {
+    try {
+      await initDynamicRouter();
+      if (!userStore.token) {
+        return { path: LOGIN_URL, replace: true };
+      }
+      return { ...to, replace: true };
+    } catch {
+      return { path: LOGIN_URL, replace: true };
+    }
   }
   
   // 7、正常访问页面。
@@ -119,8 +124,7 @@ router.onError((error: any) => {
  * @description 后置路由
  */
 // @ts-ignore
-router.afterEach((to: RouteLocationNormalized, from: RouteLocationNormalized) => {
-  // console.log("后置守卫", to, from);
+router.afterEach(() => {
   // 结束全屏动画
   nprogress.done();
 });
