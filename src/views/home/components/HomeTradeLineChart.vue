@@ -190,7 +190,8 @@ const initChartOptions = () => {
       axisLabel: {
         color: getAxisColor(),
         fontSize: 11,
-        interval: 1
+        interval: 1,
+        rotate: 45
       }
     },
     yAxis: {
