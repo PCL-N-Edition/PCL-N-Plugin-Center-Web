@@ -69,7 +69,8 @@ onMounted(async () => {
 const signIn = async () => {
   loading.value = true;
   errorMessage.value = "";
-  const redirectTo = new URL("login", window.location.origin).toString();
+  const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+  const redirectTo = import.meta.env.VITE_ROUTER_MODE === "hash" ? `${baseUrl}#/login` : new URL("login", baseUrl).toString();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "github",
     options: { redirectTo }

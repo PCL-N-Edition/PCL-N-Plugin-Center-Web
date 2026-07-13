@@ -16,6 +16,7 @@ import path from "path";
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd()); // 获取配置文件别名配置
   return {
+    base: env.VITE_BASE_PATH || "/",
     plugins: [
       vue(),
       Unocss(),
@@ -44,20 +45,19 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
       }
     },
     server: {
-      host: "0.0.0.0", // 允许本机IP访问 0.0.0.0
+      host: "127.0.0.1", // 本地管理端仅监听回环地址
       port: 5730, // 端口号
       hmr: true, // 热更新
       open: false, // 保持无界面运行，不打断桌面工作
-      proxy: {
+      proxy: env.VITE_WEB_BASE_API.startsWith("/") ? {
         // 代理跨域
         [env.VITE_WEB_BASE_API]: {
           // 配置哪个环境下的
           target: env.VITE_SERVER,
-          rewrite: path => path.replace(new RegExp("^" + env.VITE_WEB_BASE_API), ""), // 路径重写，例如：将路径中包含dev-api字段替换为空。注意：只有请求真实后端接口才会有用，使用mock接口还是得带koi
           // 允许跨域
           changeOrigin: true
         }
-      }
+      } : undefined
     },
     esbuild: {
       // 在生产环境全部去除console 和 debugger

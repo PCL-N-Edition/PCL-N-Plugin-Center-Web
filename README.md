@@ -1,5 +1,9 @@
 # PCL.N Plugin Center Web
 
+生产站点：`https://muxue1230-owo.github.io/PCL-N-Plugin-Center-Web/`
+
+生产写入 API：`https://vtvhtscdvfnuttwapzxu.supabase.co/functions/v1/plugin-center-api`
+
 PCL.N 插件中心的公开管理端，包含发布者工作台与平台管理工作区。
 
 本仓库基于 [KOI-UI](https://github.com/KoiKite/koi-ui) 开发并保留原 MIT 许可证与提交历史。平台业务代码继续使用同一 MIT 许可证。

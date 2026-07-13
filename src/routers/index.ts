@@ -9,15 +9,14 @@ import { ElMessageBox } from 'element-plus';
 import { useDebounceFn } from '@vueuse/core';
 import { initDynamicRouter, isDynamicRoutesMissing } from "@/routers/modules/dynamicRouter.ts";
 import { getMenuLanguage, isPathMatch } from "@/utils/index.ts";
-import i18n from '@/languages/index.ts';
 
 // .env配置文件读取
 const mode = import.meta.env.VITE_ROUTER_MODE;
 
 // 路由访问两种模式：带#号的哈希模式，正常路径的web模式。
 const routerMode: any = {
-  hash: () => createWebHashHistory(),
-  history: () => createWebHistory()
+  hash: () => createWebHashHistory(import.meta.env.BASE_URL),
+  history: () => createWebHistory(import.meta.env.BASE_URL)
 };
 
 // 创建路由器对象
