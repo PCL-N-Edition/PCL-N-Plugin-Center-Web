@@ -75,6 +75,11 @@
         <el-form-item label="源码仓库">
           <el-input v-model="form.repositoryUrl" placeholder="https://github.com/..." />
         </el-form-item>
+        <el-form-item label="主分类" required><el-select v-model="form.categoryId" style="width:100%"><el-option label="兼容性" value="compatibility"/><el-option label="开发工具" value="developer"/><el-option label="服务集成" value="integration"/><el-option label="管理工具" value="management"/><el-option label="界面扩展" value="ui"/><el-option label="实用工具" value="utility"/></el-select></el-form-item>
+        <el-form-item label="标签"><el-select v-model="form.tags" multiple filterable allow-create default-first-option style="width:100%" :multiple-limit="12" placeholder="最多12个标签"/></el-form-item>
+        <el-form-item label="定价"><el-radio-group v-model="form.pricingModel"><el-radio value="free">免费</el-radio><el-radio value="one_time">一次性永久授权</el-radio></el-radio-group></el-form-item>
+        <el-form-item v-if="form.pricingModel==='one_time'" label="价格（人民币）" required><el-input-number v-model="form.priceYuan" :min="1" :max="999" :precision="2"/><div class="field-tip">平台收取10%服务费，预计开发者收入 ¥{{ (form.priceYuan*0.9).toFixed(2) }}。</div></el-form-item>
+        <el-alert title="开发者应自行依法申报并缴纳相关税费；平台服务费不包含开发者应承担的税费。" type="warning" show-icon :closable="false"/>
         <el-form-item label="市场可见性">
           <el-select v-model="form.visibility" style="width: 100%">
             <el-option label="公开" value="public" />
@@ -108,6 +113,10 @@ interface PluginRow {
   description: string;
   repository_url?: string;
   visibility: string;
+  category_id: string;
+  tags: string[];
+  pricing_model: string;
+  price_cents: number;
   status: string;
   current_version?: string;
   updated_at: string;
@@ -135,7 +144,11 @@ const form = reactive({
   summary: "",
   description: "",
   repositoryUrl: "",
-  visibility: "public"
+  visibility: "public",
+  categoryId: "utility",
+  tags: [] as string[],
+  pricingModel: "free",
+  priceYuan: 0
 });
 
 const editableOrganizations = computed(() => memberships.value
@@ -175,6 +188,10 @@ const resetForm = () => {
   form.description = "";
   form.repositoryUrl = "";
   form.visibility = "public";
+  form.categoryId = "utility";
+  form.tags = [];
+  form.pricingModel = "free";
+  form.priceYuan = 0;
 };
 
 const selectDefaultNamespace = () => {
@@ -193,6 +210,10 @@ const openEditDialog = (row: PluginRow) => {
   form.description = row.description;
   form.repositoryUrl = row.repository_url ?? "";
   form.visibility = row.visibility;
+  form.categoryId = row.category_id || "utility";
+  form.tags = row.tags ?? [];
+  form.pricingModel = row.pricing_model || "free";
+  form.priceYuan = (row.price_cents ?? 0) / 100;
   dialogVisible.value = true;
 };
 
@@ -210,17 +231,27 @@ const savePlugin = async () => {
       repositoryUrl: form.repositoryUrl.trim() || undefined,
       visibility: form.visibility
     };
+    let targetId = editingId.value;
     if (editingId.value) {
       await pluginCenterApi.updatePlugin(editingId.value, common);
       ElMessage.success("插件信息已更新");
     } else {
-      await pluginCenterApi.createPlugin({
+      const created = await pluginCenterApi.createPlugin({
         ...common,
         organizationId: form.organizationId,
         namespaceId: form.namespaceId,
         pluginId: form.pluginId.trim().toLowerCase()
       });
+      targetId = String(created.id ?? "");
       ElMessage.success("插件草稿已创建");
+    }
+    if (targetId) {
+      await pluginCenterApi.setMarketMetadata(targetId, {
+        categoryId: form.categoryId,
+        tags: form.tags.map(item => item.trim()).filter(Boolean),
+        pricingModel: form.pricingModel,
+        priceCents: form.pricingModel === "free" ? 0 : Math.round(form.priceYuan * 100)
+      });
     }
     dialogVisible.value = false;
     await loadData();

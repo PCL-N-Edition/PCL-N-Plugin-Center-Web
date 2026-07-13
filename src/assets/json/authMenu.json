@@ -74,6 +74,20 @@
       "isAffix": "0"
     },
     {
+      "menuId": 105,
+      "menuName": "收入与提现",
+      "parentId": 100,
+      "menuType": "2",
+      "path": "/publisher/finance",
+      "name": "publisherFinance",
+      "component": "publisher/finance/index",
+      "icon": "koi-wallet",
+      "isVisible": "1",
+      "isKeepAlive": "1",
+      "isTag": "0",
+      "isAffix": "0"
+    },
+    {
       "menuId": 200,
       "menuName": "平台管理",
       "parentId": 0,
@@ -143,6 +157,21 @@
       "name": "adminUsers",
       "component": "admin/users/index",
       "icon": "koi-user-search",
+      "isVisible": "1",
+      "isKeepAlive": "1",
+      "isTag": "0",
+      "isAffix": "0",
+      "workspace": "admin"
+    },
+    {
+      "menuId": 205,
+      "menuName": "提现审核",
+      "parentId": 200,
+      "menuType": "2",
+      "path": "/admin/withdrawals",
+      "name": "adminWithdrawals",
+      "component": "admin/withdrawals/index",
+      "icon": "koi-wallet",
       "isVisible": "1",
       "isKeepAlive": "1",
       "isTag": "0",

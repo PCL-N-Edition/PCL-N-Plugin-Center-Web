@@ -37,21 +37,44 @@ export interface UploadVersionInput {
   package: File;
 }
 
+export interface MarketPlugin {
+  pluginId: string;
+  name: string;
+  summary?: string;
+  description?: string;
+  latestVersion?: string;
+  publisherId?: string;
+  publisherName?: string;
+  category: string;
+  categories: string[];
+  tags: string[];
+  pricingModel: "free" | "one_time";
+  priceCents: number;
+  currency: "CNY";
+  requiresPurchase: boolean;
+  permissions?: string[];
+  source?: string;
+}
+
+export interface MarketCategory { id: string; name: string; description?: string; }
+export interface MarketMetadataInput { categoryId: string; tags: string[]; pricingModel: string; priceCents: number; }
+
 export class PluginCenterApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
   }
 }
 
-const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
-  const accessToken = data.session?.access_token;
-  if (!accessToken) throw new PluginCenterApiError("登录已过期，请重新登录", 401);
-
+const request = async <T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> => {
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${accessToken}`);
   headers.set("apikey", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+  if (authenticated) {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new PluginCenterApiError("请先登录", 401);
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   const response = await fetch(`${import.meta.env.VITE_WEB_BASE_API}/v1${path}`, {
@@ -70,6 +93,43 @@ const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
 const jsonBody = (value: unknown) => JSON.stringify(value);
 
 export const pluginCenterApi = {
+  listMarketPlugins: (query: { search?: string; category?: string; skip?: number; take?: number } = {}) => {
+    const parameters = new URLSearchParams();
+    if (query.search) parameters.set("search", query.search);
+    if (query.category) parameters.set("category", query.category);
+    parameters.set("skip", String(query.skip ?? 0));
+    parameters.set("take", String(query.take ?? 50));
+    return request<MarketPlugin[]>(`/plugins?${parameters}`, {}, false);
+  },
+  getMarketPlugin: (pluginId: string) => request<MarketPlugin>(`/plugins/${encodeURIComponent(pluginId)}`, {}, false),
+  listCategories: () => request<MarketCategory[]>("/categories", {}, false),
+  getEntitlement: (pluginId: string) => request<{ entitled: boolean; source?: string }>(`/plugins/${encodeURIComponent(pluginId)}/entitlement`),
+  redeemPurchase: (pluginId: string, orderNumber: string, overpaymentDestination: string) => request<Record<string, unknown>>(
+    "/purchases/redeem", { method: "POST", body: jsonBody({ pluginId, orderNumber, overpaymentDestination }) }),
+  setMarketMetadata: (pluginId: string, input: MarketMetadataInput) => request<Record<string, unknown>>(
+    `/publisher/plugins/${pluginId}/market`, { method: "POST", body: jsonBody(input) }),
+  getFinanceSummary: (organizationId: string) => request<Record<string, number>>(`/publisher/organizations/${organizationId}/finance`),
+  savePayoutProfile: (organizationId: string, account: string, recipient: string) => request<Record<string, unknown>>(
+    `/publisher/organizations/${organizationId}/payout-profile`, { method: "PUT", body: jsonBody({ account, recipient }) }),
+  requestWithdrawal: (organizationId: string, amountCents: number) => request<Record<string, unknown>>(
+    `/publisher/organizations/${organizationId}/withdrawals`, { method: "POST", body: jsonBody({ amountCents }) }),
+  decideWithdrawal: (withdrawalId: string, decision: string, reason: string) => request<Record<string, unknown>>(
+    `/admin/withdrawals/${withdrawalId}/decision`, { method: "POST", body: jsonBody({ decision, reason }) }),
+  getAccount: () => request<{
+    profile: Record<string, unknown> | null;
+    preferences: Record<string, unknown> | null;
+    providers: string[];
+    grants: Record<string, unknown>[];
+    pluginData: Record<string, unknown>[];
+  }>("/account"),
+  approveDesktopPairing: (code: string, provider: "github" | "azure", providerToken?: string) => request<{ approved: boolean }>(
+    "/desktop/pairings/approve", { method: "POST", body: jsonBody({ code, provider, providerToken }) }),
+  updateProfile: (displayName: string, avatarUrl: string, bio: string) => request<Record<string, unknown>>(
+    "/account/profile", { method: "PUT", body: jsonBody({ displayName, avatarUrl, bio }) }),
+  setPluginGrant: (pluginId: string, scopes: string[]) => request<Record<string, unknown>>(
+    `/account/plugins/${pluginId}/grants`, { method: "PUT", body: jsonBody({ scopes }) }),
+  deletePluginData: (pluginId: string) => request<{ deleted: number }>(
+    `/account/plugins/${pluginId}/data`, { method: "DELETE" }),
   createOrganization: (input: CreateOrganizationInput) => request<Record<string, unknown>>(
     "/publisher/organizations",
     { method: "POST", body: jsonBody(input) }

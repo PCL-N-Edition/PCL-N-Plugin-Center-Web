@@ -4,6 +4,24 @@ import Layout from "@/layouts/index.vue";
 
 export const layoutRouter: RouteRecordRaw[] = [
   {
+    path: "/market",
+    name: "publicMarket",
+    component: () => import("@/views/market/index.vue"),
+    meta: { title: "插件市场" }
+  },
+  {
+    path: "/market/plugins/:pluginId",
+    name: "publicMarketDetail",
+    component: () => import("@/views/market/detail.vue"),
+    meta: { title: "插件详情" }
+  },
+  {
+    path: "/account",
+    name: "onlineAccount",
+    component: () => import("@/views/account/index.vue"),
+    meta: { title: "PCL N 在线服务账户" }
+  },
+  {
     path: LOGIN_URL,
     name: "login",
     component: () => import("@/views/login/index.vue"),

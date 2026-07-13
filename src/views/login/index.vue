@@ -28,14 +28,17 @@
           :closable="false"
           class="login-alert"
         />
-        <el-button type="primary" size="large" :loading="loading" class="github-button" @click="signIn">
-          <span class="github-icon">GH</span>
-          使用 GitHub 登录
+        <el-button type="primary" size="large" :loading="loadingProvider==='github'" class="oauth-button" @click="signIn('github')">
+          <span class="github-icon">GH</span>使用 GitHub 登录
+        </el-button>
+        <el-button size="large" :loading="loadingProvider==='azure'" class="oauth-button microsoft" @click="signIn('azure')">
+          <span class="microsoft-icon">M</span>使用 Microsoft 登录
         </el-button>
         <div class="security-note">
           <el-icon><Lock /></el-icon>
           <span>前端仅使用 Supabase Publishable Key；管理写入由受保护 API 完成。</span>
         </div>
+        <router-link to="/market" class="market-link">浏览插件市场</router-link>
         <a href="https://github.com/MuXue1230-owo/PCL-N-Plugin-Center-Web" target="_blank" rel="noreferrer">
           查看开源管理端
         </a>
@@ -46,37 +49,63 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { ElMessageBox } from "element-plus";
 import { Lock } from "@element-plus/icons-vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { HOME_URL } from "@/config";
 import { supabase } from "@/lib/supabase";
 import useUserStore from "@/stores/modules/user";
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
-const loading = ref(false);
+const loadingProvider = ref<"github" | "azure" | "">("");
 const errorMessage = ref("");
 
 onMounted(async () => {
+  const oauthError = String(route.query.error_description ?? route.query.error ?? "");
+  if (/email|identity|already|registered|exists/i.test(oauthError)) {
+    try {
+      await ElMessageBox.confirm(
+        "该邮箱已属于另一个 PCL N 在线服务账户。是否登录原账户，然后绑定刚才选择的登录方式？",
+        "账户已存在",
+        { confirmButtonText: "登录原账户并绑定", cancelButtonText: "取消", type: "warning" }
+      );
+      const attemptedProvider = sessionStorage.getItem("pcln-attempted-provider");
+      if (attemptedProvider) sessionStorage.setItem("pcln-pending-link-provider", attemptedProvider);
+      await supabase.auth.signOut();
+      errorMessage.value = "请使用原账户登录。登录后将在账户页确认绑定。";
+      return;
+    } catch {
+      errorMessage.value = "未创建重复账户。你可以使用原账户登录后再绑定此登录方式。";
+      return;
+    }
+  }
   try {
     await userStore.restoreSession(true);
-    if (userStore.token) await router.replace(HOME_URL);
+    if (userStore.token) {
+      const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
+        ? route.query.redirect
+        : HOME_URL;
+      await router.replace(redirect);
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "无法恢复登录会话";
   }
 });
 
-const signIn = async () => {
-  loading.value = true;
+const signIn = async (provider: "github" | "azure") => {
+  loadingProvider.value = provider;
+  sessionStorage.setItem("pcln-attempted-provider", provider);
   errorMessage.value = "";
   const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
   const { error } = await supabase.auth.signInWithOAuth({
-    provider: "github",
-    options: { redirectTo: baseUrl }
+    provider,
+    options: { redirectTo: new URL(typeof route.query.redirect === "string" ? route.query.redirect : "/", baseUrl).toString(), scopes: provider === "azure" ? "openid profile email offline_access XboxLive.signin" : undefined }
   });
   if (error) {
     errorMessage.value = error.message;
-    loading.value = false;
+    loadingProvider.value = "";
   }
 };
 </script>
@@ -117,8 +146,9 @@ const signIn = async () => {
 .login-card h2 { margin: 24px 0 12px; font-size: 28px; }
 .login-copy { margin: 0 0 28px; line-height: 1.75; color: var(--el-text-color-secondary); }
 .login-alert { margin-bottom: 18px; text-align: left; }
-.github-button { width: 100%; height: 48px; font-weight: 600; }
-.github-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; font-size: 10px; background: rgba(255,255,255,.18); }
+.oauth-button { width: 100%; height: 48px; font-weight: 600; margin: 0 0 12px; }
+.microsoft { color: #fff; border-color: #1769aa; background: #1769aa; }
+.microsoft-icon, .github-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; font-size: 10px; background: rgba(255,255,255,.18); }
 .security-note { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0; padding: 14px; border-radius: 12px; text-align: left; font-size: 12px; line-height: 1.6; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); }
 .login-card a { color: var(--el-color-primary); font-size: 13px; }
 
