@@ -84,9 +84,11 @@ onMounted(async () => {
   try {
     await userStore.restoreSession(true);
     if (userStore.token) {
+      const storedRedirect = sessionStorage.getItem("pcln-login-redirect");
       const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
         ? route.query.redirect
-        : HOME_URL;
+        : storedRedirect?.startsWith("/") ? storedRedirect : HOME_URL;
+      sessionStorage.removeItem("pcln-login-redirect");
       await router.replace(redirect);
     }
   } catch (error) {
@@ -97,11 +99,16 @@ onMounted(async () => {
 const signIn = async (provider: "github" | "azure") => {
   loadingProvider.value = provider;
   sessionStorage.setItem("pcln-attempted-provider", provider);
+  sessionStorage.setItem("pcln-current-oauth-provider", provider);
   errorMessage.value = "";
-  const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+  const target = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
+    ? route.query.redirect
+    : "/";
+  sessionStorage.setItem("pcln-login-redirect", target);
+  const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: new URL(typeof route.query.redirect === "string" ? route.query.redirect : "/", baseUrl).toString(), scopes: provider === "azure" ? "openid profile email offline_access XboxLive.signin" : undefined }
+    options: { redirectTo, scopes: provider === "azure" ? "openid profile email offline_access XboxLive.signin" : undefined }
   });
   if (error) {
     errorMessage.value = error.message;

@@ -104,8 +104,9 @@ const approvePairing = async () => {
     if (pairingProvider.value !== currentProvider) {
       throw new Error(`当前会话由 ${providerLabel(String(currentProvider ?? "未知方式"))} 签发。请退出后使用 ${providerLabel(pairingProvider.value)} 重新登录，再确认配对。`);
     }
-    const providerToken = pairingProvider.value === "azure" ? data.session?.provider_token : undefined;
-    if (pairingProvider.value === "azure" && !providerToken) throw new Error("Microsoft 登录会话不包含 Provider Token，请使用 Microsoft 重新登录后配对。");
+    const currentOAuthProvider = sessionStorage.getItem("pcln-current-oauth-provider");
+    const providerToken = pairingProvider.value === "azure" && currentOAuthProvider === "azure" ? data.session?.provider_token : undefined;
+    if (pairingProvider.value === "azure" && !providerToken) throw new Error("请退出后使用 Microsoft 重新登录，再确认 Microsoft 配对；当前会话无法证明 Provider Token 来自 Microsoft。");
     await pluginCenterApi.approveDesktopPairing(pairingCode.value, pairingProvider.value, providerToken ?? undefined); message.value = "桌面端已连接，可以返回 PCL N。"; messageType.value = "success"; }
   catch (error) { message.value = error instanceof Error ? error.message : "配对失败"; messageType.value = "error"; }
   finally { approving.value = false; }
