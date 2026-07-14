@@ -134,7 +134,7 @@ const signIn = async (provider: "github" | "azure") => {
   redirectTo.hash = `#${target}`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: redirectTo.toString(), scopes: provider === "azure" ? "openid profile email offline_access XboxLive.signin" : undefined }
+    options: { redirectTo: redirectTo.toString(), scopes: provider === "azure" ? "openid profile email" : undefined }
   });
   if (error) {
     errorMessage.value = error.message;
