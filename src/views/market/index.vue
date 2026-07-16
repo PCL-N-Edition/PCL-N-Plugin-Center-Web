@@ -8,7 +8,7 @@
         <a v-else :href="authHref">登录</a>
       </nav>
     </header>
-    <section class="hero"><span>可信插件生态</span><h1>发现适合你的 PCL.N 插件</h1><p>公开浏览经过审核的插件。下载与购买需要登录。</p></section>
+    <section class="hero"><span>可信插件生态</span><h1>发现适合你的 PCL.N 插件</h1><p>网页浏览与购买；免费/已购插件在 PCL.N 启动器「市场」中获取并完成市场验签（类似 App Store）。</p></section>
     <section class="filters">
       <el-input v-model="search" clearable placeholder="搜索名称或插件 ID" @keyup.enter="load" />
       <el-select v-model="category" placeholder="全部分类" clearable @change="load"><el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" /></el-select>
