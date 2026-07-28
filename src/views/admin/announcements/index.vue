@@ -228,7 +228,7 @@ const load = async () => {
   errorMessage.value = "";
   try {
     const data = await pluginCenterApi.listAdminAnnouncements();
-    announcements.value = (data.announcements ?? []) as AnnouncementRow[];
+    announcements.value = (data.announcements ?? []) as unknown as AnnouncementRow[];
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "加载失败";
   } finally {
