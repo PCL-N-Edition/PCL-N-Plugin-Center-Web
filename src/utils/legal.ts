@@ -1,5 +1,5 @@
 /** N Cloud legal document version under public/legal/. Bump when text changes. */
-export const NCLOUD_LEGAL_VERSION = "v0.1";
+export const NCLOUD_LEGAL_VERSION = "v0.2";
 
 const STORAGE_KEY = "pcln-ncloud-legal-accepted";
 
