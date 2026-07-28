@@ -32,6 +32,12 @@ export const layoutRouter: RouteRecordRaw[] = [
     name: "login",
     component: () => import("@/views/login/index.vue"),
     meta: { title: "登录" }
+  },
+  {
+    path: "/legal/accept",
+    name: "legalAccept",
+    component: () => import("@/views/legal/accept.vue"),
+    meta: { title: "用户协议" }
   }
 ];
 

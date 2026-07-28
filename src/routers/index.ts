@@ -5,6 +5,7 @@ import { RouteLocationNormalized } from "vue-router";
 import useUserStore from "@/stores/modules/user.ts";
 import useAuthStore from "@/stores/modules/auth.ts";
 import { LOGIN_URL, ROUTER_WHITE_LIST } from "@/config/index.ts";
+import { hasAcceptedNCloudLegal } from "@/utils/legal";
 import { ElMessageBox } from 'element-plus';
 import { useDebounceFn } from '@vueuse/core';
 import { initDynamicRouter, isDynamicRoutesMissing } from "@/routers/modules/dynamicRouter.ts";
@@ -141,6 +142,19 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
       return false;
     }
     return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true }; // 重定向到登录页并保留目标
+  }
+
+  // 5b、首次登录/注册后须同意 N Cloud 用户协议与隐私政策（版本见 legal.ts）。
+  if (
+    to.path !== "/legal/accept" &&
+    to.path.toLocaleLowerCase() !== LOGIN_URL &&
+    !hasAcceptedNCloudLegal()
+  ) {
+    return {
+      path: "/legal/accept",
+      query: { redirect: to.fullPath },
+      replace: true
+    };
   }
 
   // 6、无菜单数据，或菜单在 store 中但路由未注册（如 resetRouter 后），需重新拉取/注册动态路由

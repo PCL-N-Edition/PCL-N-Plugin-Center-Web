@@ -28,10 +28,32 @@
           :closable="false"
           class="login-alert"
         />
-        <el-button type="primary" size="large" :loading="loadingProvider==='github'" class="oauth-button" @click="signIn('github')">
+        <div class="legal-block">
+          <el-checkbox v-model="acceptedLegal">
+            我已阅读并同意
+            <a :href="legalUrls.terms" target="_blank" rel="noreferrer" @click.stop>《用户服务协议》</a>
+            和
+            <a :href="legalUrls.privacy" target="_blank" rel="noreferrer" @click.stop>《隐私保护协议》</a>
+          </el-checkbox>
+          <p class="legal-hint">首次注册 / 登录 N Cloud 前须确认。协议版本 {{ legalVersion }}。</p>
+        </div>
+        <el-button
+          type="primary"
+          size="large"
+          :loading="loadingProvider==='github'"
+          :disabled="!acceptedLegal"
+          class="oauth-button"
+          @click="signIn('github')"
+        >
           <span class="github-icon">GH</span>使用 GitHub 登录
         </el-button>
-        <el-button size="large" :loading="loadingProvider==='azure'" class="oauth-button microsoft" @click="signIn('azure')">
+        <el-button
+          size="large"
+          :loading="loadingProvider==='azure'"
+          :disabled="!acceptedLegal"
+          class="oauth-button microsoft"
+          @click="signIn('azure')"
+        >
           <span class="microsoft-icon">M</span>使用 Microsoft 登录
         </el-button>
         <div class="security-note">
@@ -52,18 +74,27 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { Lock } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
 import { HOME_URL } from "@/config";
 import { supabase } from "@/lib/supabase";
 import useUserStore from "@/stores/modules/user";
+import {
+  NCLOUD_LEGAL_VERSION,
+  acceptNCloudLegal,
+  hasAcceptedNCloudLegal,
+  legalDocumentUrls
+} from "@/utils/legal";
 
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
 const loadingProvider = ref<"github" | "azure" | "">("");
 const errorMessage = ref("");
+const acceptedLegal = ref(hasAcceptedNCloudLegal());
+const legalVersion = NCLOUD_LEGAL_VERSION;
+const legalUrls = legalDocumentUrls;
 const PRIMARY_STORE_ORIGIN = "https://pcln.top";
 const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
 const isPrimaryStoreHost = () => ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
@@ -106,6 +137,10 @@ onMounted(async () => {
     }
     const oauthProvider = route.query.provider;
     if (oauthProvider === "github" || oauthProvider === "azure") {
+      if (!acceptedLegal.value) {
+        errorMessage.value = "请先勾选同意用户服务协议与隐私保护协议，再继续登录。";
+        return;
+      }
       await signIn(oauthProvider);
     }
   } catch (error) {
@@ -114,6 +149,12 @@ onMounted(async () => {
 });
 
 const signIn = async (provider: "github" | "azure") => {
+  if (!acceptedLegal.value) {
+    ElMessage.warning("请先阅读并勾选同意用户服务协议与隐私保护协议");
+    return;
+  }
+  // Record acceptance at registration/login intent so OAuth callback is not blocked.
+  acceptNCloudLegal();
   loadingProvider.value = provider;
   sessionStorage.setItem("pcln-attempted-provider", provider);
   sessionStorage.setItem("pcln-current-oauth-provider", provider);
@@ -179,6 +220,28 @@ const signIn = async (provider: "github" | "azure") => {
 .login-card h2 { margin: 24px 0 12px; font-size: 28px; }
 .login-copy { margin: 0 0 28px; line-height: 1.75; color: var(--el-text-color-secondary); }
 .login-alert { margin-bottom: 18px; text-align: left; }
+.legal-block {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  text-align: left;
+  background: var(--el-fill-color-light);
+}
+.legal-block :deep(.el-checkbox) {
+  height: auto;
+  align-items: flex-start;
+  white-space: normal;
+}
+.legal-block a {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+.legal-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
 .oauth-button { width: 100%; height: 48px; font-weight: 600; margin: 0 0 12px; }
 .microsoft { color: #fff; border-color: #1769aa; background: #1769aa; }
 .microsoft-icon, .github-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; font-size: 10px; background: rgba(255,255,255,.18); }
