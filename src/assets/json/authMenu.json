@@ -177,6 +177,36 @@
       "isTag": "0",
       "isAffix": "0",
       "workspace": "admin"
+    },
+    {
+      "menuId": 206,
+      "menuName": "管理员",
+      "parentId": 200,
+      "menuType": "2",
+      "path": "/admin/members",
+      "name": "adminMembers",
+      "component": "admin/members/index",
+      "icon": "koi-shield-tick",
+      "isVisible": "1",
+      "isKeepAlive": "1",
+      "isTag": "0",
+      "isAffix": "0",
+      "workspace": "admin"
+    },
+    {
+      "menuId": 207,
+      "menuName": "启动器公告",
+      "parentId": 200,
+      "menuType": "2",
+      "path": "/admin/announcements",
+      "name": "adminAnnouncements",
+      "component": "admin/announcements/index",
+      "icon": "koi-notification",
+      "isVisible": "1",
+      "isKeepAlive": "1",
+      "isTag": "0",
+      "isAffix": "0",
+      "workspace": "admin"
     }
   ]
 }

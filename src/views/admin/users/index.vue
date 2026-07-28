@@ -1,12 +1,21 @@
 <template>
-  <EntityTablePage
-    eyebrow="Admin Workspace"
-    title="用户"
-    description="用户身份来自 Supabase Auth；此处只展示独立 profile，权限不读取可修改的 user_metadata。"
-    table="plugin_center_profiles"
-    order-by="created_at"
-    :columns="columns"
-  />
+  <div class="center-page">
+    <EntityTablePage
+      eyebrow="Admin Workspace"
+      title="用户"
+      description="用户身份来自 Supabase Auth。复制 UUID 后可到「管理员」页任命为 admin / reviewer / auditor。"
+      table="plugin_center_profiles"
+      order-by="created_at"
+      :columns="columns"
+    />
+    <el-alert
+      class="hint"
+      type="info"
+      :closable="false"
+      show-icon
+      title="任命管理员：打开左侧「平台管理 → 管理员」，粘贴用户 UUID 并选择角色。"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -19,3 +28,14 @@ const columns = [
   { prop: "created_at", label: "首次登录", kind: "date" as const, minWidth: 180 }
 ];
 </script>
+
+<style scoped>
+.center-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hint {
+  border-radius: 12px;
+}
+</style>

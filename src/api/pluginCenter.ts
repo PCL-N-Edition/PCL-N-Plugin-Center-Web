@@ -364,5 +364,56 @@ export const pluginCenterApi = {
   setOrganizationStatus: (organizationId: string, status: string) => request<Record<string, unknown>>(
     `/admin/organizations/${organizationId}/status`,
     { method: "POST", body: jsonBody({ status }) }
+  ),
+  listAdminMembers: () => request<{
+    members: Array<{
+      userId: string;
+      role: string;
+      createdBy: string | null;
+      createdAt: string;
+      displayName: string;
+      githubLogin: string | null;
+      avatarUrl: string | null;
+      email: string | null;
+    }>;
+  }>("/admin/members"),
+  appointAdminMember: (userId: string, role: "admin" | "reviewer" | "auditor" = "admin") =>
+    request<Record<string, unknown>>("/admin/members", {
+      method: "POST",
+      body: jsonBody({ userId, role })
+    }),
+  revokeAdminMember: (userId: string) => request<{ revoked: boolean }>(
+    `/admin/members/${encodeURIComponent(userId)}`,
+    { method: "DELETE" }
+  ),
+  listAdminAnnouncements: () => request<{ announcements: Record<string, unknown>[] }>(
+    "/admin/announcements"
+  ),
+  upsertAdminAnnouncement: (input: {
+    id: string;
+    enabled: boolean;
+    severity: "info" | "important" | "security";
+    priority: number;
+    startsAt?: string;
+    endsAt?: string | null;
+    minimumVersion?: string | null;
+    maximumVersionExclusive?: string | null;
+    channels?: string[];
+    platforms?: string[];
+    dismissible?: boolean;
+    localizedContent: Record<string, {
+      title: string;
+      body: string;
+      primaryLabel?: string;
+      actionLabel?: string;
+      actionUrl?: string;
+    }>;
+  }) => request<{ announcement: Record<string, unknown> }>(
+    "/admin/announcements",
+    { method: "PUT", body: jsonBody(input) }
+  ),
+  deleteAdminAnnouncement: (id: string) => request<{ deleted: boolean }>(
+    `/admin/announcements/${encodeURIComponent(id)}`,
+    { method: "DELETE" }
   )
 };
