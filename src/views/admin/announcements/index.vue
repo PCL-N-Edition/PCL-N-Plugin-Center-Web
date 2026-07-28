@@ -142,6 +142,17 @@
         <el-form-item label="Body Markdown">
           <el-input v-model="form.enBody" type="textarea" :rows="5" clearable />
         </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="Primary button label">
+            <el-input v-model="form.enPrimaryLabel" placeholder="OK" clearable />
+          </el-form-item>
+          <el-form-item label="Action button label">
+            <el-input v-model="form.enActionLabel" placeholder="Learn more" clearable />
+          </el-form-item>
+        </div>
+        <el-form-item label="Action URL">
+          <el-input v-model="form.enActionUrl" placeholder="https://..." clearable />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -204,7 +215,10 @@ const form = reactive({
   zhActionLabel: "",
   zhActionUrl: "",
   enTitle: "",
-  enBody: ""
+  enBody: "",
+  enPrimaryLabel: "OK",
+  enActionLabel: "",
+  enActionUrl: ""
 });
 
 const severityLabel = (value: string) =>
@@ -256,6 +270,9 @@ const resetForm = () => {
   form.zhActionUrl = "";
   form.enTitle = "";
   form.enBody = "";
+  form.enPrimaryLabel = "OK";
+  form.enActionLabel = "";
+  form.enActionUrl = "";
 };
 
 const openCreate = () => {
@@ -285,6 +302,9 @@ const openEdit = (row: AnnouncementRow) => {
   form.zhActionUrl = zh.actionUrl ?? "";
   form.enTitle = en.title ?? "";
   form.enBody = en.body ?? "";
+  form.enPrimaryLabel = en.primaryLabel ?? "OK";
+  form.enActionLabel = en.actionLabel ?? "";
+  form.enActionUrl = en.actionUrl ?? "";
   dialogVisible.value = true;
 };
 
@@ -315,9 +335,9 @@ const save = async () => {
     localizedContent["en-US"] = {
       title: form.enTitle.trim(),
       body: form.enBody.trim(),
-      primaryLabel: "OK",
-      actionLabel: form.zhActionLabel.trim() || undefined,
-      actionUrl: form.zhActionUrl.trim() || undefined
+      primaryLabel: form.enPrimaryLabel.trim() || "OK",
+      actionLabel: form.enActionLabel.trim() || undefined,
+      actionUrl: form.enActionUrl.trim() || undefined
     };
   }
 
