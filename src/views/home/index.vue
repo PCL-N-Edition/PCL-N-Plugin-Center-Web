@@ -2,7 +2,9 @@
   <div class="dashboard-page">
     <section class="welcome-panel">
       <div>
-        <el-tag effect="dark" round>{{ authStore.isAdmin ? "平台管理员" : "发布者" }}</el-tag>
+        <el-tag effect="dark" round>
+          {{ authStore.isSuperAdmin ? "超级管理员" : authStore.isAdmin ? "平台管理员" : "发布者" }}
+        </el-tag>
         <h1>欢迎回来，{{ authStore.loginUser.loginName || "PCL.N 用户" }}</h1>
         <p>这里展示当前账号经 RLS 授权后可见的插件、版本、审核与组织数据。</p>
       </div>

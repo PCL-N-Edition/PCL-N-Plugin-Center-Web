@@ -375,7 +375,10 @@ export const pluginCenterApi = {
       githubLogin: string | null;
       avatarUrl: string | null;
       email: string | null;
+      isSuperAdmin?: boolean;
     }>;
+    canManageMembers: boolean;
+    superAdminUserId: string;
   }>("/admin/members"),
   appointAdminMember: (userId: string, role: "admin" | "reviewer" | "auditor" = "admin") =>
     request<Record<string, unknown>>("/admin/members", {

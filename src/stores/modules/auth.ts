@@ -5,6 +5,9 @@ import { generateRoutes, generateFlattenRoutes } from "@/utils/filterRoute.ts";
 import { getShowStaticAndDynamicMenuList, getAllBreadcrumbList } from "@/utils/index.ts";
 import { supabase } from "@/lib/supabase";
 
+/** Immutable platform super admin — only this account manages administrators. */
+const PLATFORM_SUPER_ADMIN_USER_ID = "ebdb905b-0309-4deb-a8d6-9c9fbc7081ca";
+
 const authStore = defineStore("auth", {
   state: (): any => ({
     menuList: [],
@@ -13,6 +16,7 @@ const authStore = defineStore("auth", {
     roleList: [],
     buttonList: [],
     isAdmin: false,
+    isSuperAdmin: false,
     loginUser: {
       userId: "",
       loginName: "",
@@ -26,6 +30,7 @@ const authStore = defineStore("auth", {
       if (error || !data.user) throw error ?? new Error("Supabase session is unavailable.");
 
       const user = data.user;
+      const isSuperAdmin = user.id.toLowerCase() === PLATFORM_SUPER_ADMIN_USER_ID;
       const { data: adminMembership, error: adminError } = await supabase
         .from("plugin_center_admin_members")
         .select("role")
@@ -33,8 +38,11 @@ const authStore = defineStore("auth", {
         .maybeSingle();
       if (adminError) throw adminError;
 
-      this.isAdmin = Boolean(adminMembership);
-      this.roleList = adminMembership ? ["publisher", adminMembership.role] : ["publisher"];
+      // Super admin is always admin, even if membership row is briefly missing.
+      this.isSuperAdmin = isSuperAdmin;
+      this.isAdmin = Boolean(adminMembership) || isSuperAdmin;
+      const role = isSuperAdmin ? "admin" : adminMembership?.role;
+      this.roleList = this.isAdmin && role ? ["publisher", role] : ["publisher"];
       this.buttonList = [];
       this.loginUser = {
         userId: user.id,
