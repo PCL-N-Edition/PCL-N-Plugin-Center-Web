@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * Build-time scraper: GitHub *web pages only* (no api.github.com).
- * Writes public/launcher-releases.json for the SPA (same-origin, no browser CORS/proxy).
+ * Same discovery model as PCL.Application LauncherUpdateService:
+ *   - Atom:  https://github.com/{owner}/{repo}/releases.atom
+ *   - Latest: https://github.com/{owner}/{repo}/releases/latest  (Location → stable tag)
+ *   - Assets: convention URLs only (no REST API, no expanded_assets listing)
  *
- * Sources:
- *   - https://github.com/PCL-N-Edition/PCL-N/releases.atom
- *   - https://github.com/PCL-N-Edition/PCL-N/releases?page=N
- *   - https://github.com/PCL-N-Edition/PCL-N/releases/expanded_assets/{tag}
+ * Writes public/launcher-releases.json for the SPA (same-origin load).
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -16,106 +15,71 @@ import { fileURLToPath } from "node:url";
 import https from "node:https";
 import http from "node:http";
 
-const REPO = "PCL-N-Edition/PCL-N";
+// Match production releases host (LauncherUpdateService defaults redirect here).
+const OWNER = "PCL-N-Edition";
+const REPO = "PCL-N";
 const GH = "https://github.com";
-const PACKAGE_ASSET = /^PCL_N_(Release|Beta|CI)_/i;
-const SKIP_ASSET = /\.(asc|sha256|hdiff|json)$/i;
+const CI_TAG = "ci-latest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outPath = join(__dirname, "..", "public", "launcher-releases.json");
 
-function detectChannel(tag) {
-  const t = String(tag || "").trim();
-  if (!t) return null;
-  if (/^ci(-|$)/i.test(t) || t.toLowerCase() === "ci-latest") return "ci";
-  if (/-release$/i.test(t)) return "release";
-  if (/-beta$/i.test(t) || /-rc\d*$/i.test(t) || /beta/i.test(t)) return "beta";
-  return "release";
-}
-
-function isPackageAsset(name) {
-  if (SKIP_ASSET.test(name)) return false;
-  return PACKAGE_ASSET.test(name) || /Portable|Installer/i.test(name);
-}
-
-function packagingOf(assets) {
-  return assets.some(a => /_Installer\.|_Portable\./i.test(a.name)) ? "v2" : "legacy";
-}
-
-function supportsPluginChoice(assets) {
-  return assets.some(a => /_(WithPlugin|NoPlugin)(\.|_)/i.test(a.name));
-}
-
-function labelFor(tag, channel, title) {
-  if (channel === "ci") {
-    const sha = title?.match(/[0-9a-f]{7,40}/i)?.[0];
-    return sha ? `CI ${sha.slice(0, 7)}` : "CI latest";
-  }
-  const core = tag.replace(/^v/i, "").replace(/-release$/i, "").replace(/-beta$/i, "");
-  return channel === "beta" ? `${core} Beta` : core;
-}
-
-function compareTagsDesc(a, b) {
-  if (a === b) return 0;
-  if (/^ci/i.test(a) && !/^ci/i.test(b)) return -1;
-  if (/^ci/i.test(b) && !/^ci/i.test(a)) return 1;
-  const parse = tag => {
-    const m = tag.match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-.](.+))?$/i);
-    if (!m) return { major: 0, minor: 0, patch: 0, pre: tag };
-    return { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] ?? "" };
-  };
-  const pa = parse(a);
-  const pb = parse(b);
-  if (pa.major !== pb.major) return pb.major - pa.major;
-  if (pa.minor !== pb.minor) return pb.minor - pa.minor;
-  if (pa.patch !== pb.patch) return pb.patch - pa.patch;
-  if (!pa.pre && pb.pre) return -1;
-  if (pa.pre && !pb.pre) return 1;
-  return pb.pre.localeCompare(pa.pre, undefined, { numeric: true, sensitivity: "base" });
-}
-
-function decodeHtmlEntities(value) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function fetchTextWithCurl(url) {
-  // Prefer curl: more reliable than Node fetch in restricted CI/dev networks.
+function fetchTextWithCurl(url, extraArgs = []) {
   return execFileSync(
     "curl",
     [
       "-sL",
       "--fail",
       "--max-time",
-      "60",
+      "45",
       "-A",
-      "PCL-N-Plugin-Center-Web-release-scraper/1.0",
+      "PCL-N/1.0",
       "-H",
-      "Accept: text/html,application/xhtml+xml,application/atom+xml,text/plain,*/*",
+      "Accept: application/atom+xml,text/html,application/xhtml+xml,*/*",
+      ...extraArgs,
       url
     ],
-    { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }
+    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
   );
 }
 
-function fetchTextWithHttps(url) {
+/** curl -I without following redirects (read Location for /releases/latest). */
+function fetchHeadersWithCurl(url) {
+  return execFileSync(
+    "curl",
+    [
+      "-sI",
+      "--max-time",
+      "30",
+      "-A",
+      "PCL-N/1.0",
+      url
+    ],
+    { encoding: "utf8", maxBuffer: 1024 * 1024 }
+  );
+}
+
+function fetchTextWithHttps(url, redirectLeft = 6) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith("https:") ? https : http;
     const req = lib.get(
       url,
       {
         headers: {
-          Accept: "text/html,application/xhtml+xml,application/atom+xml,text/plain,*/*",
-          "User-Agent": "PCL-N-Plugin-Center-Web-release-scraper/1.0"
+          Accept: "application/atom+xml,text/html,*/*",
+          "User-Agent": "PCL-N/1.0"
         }
       },
       res => {
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          fetchTextWithHttps(res.headers.location).then(resolve, reject);
+          if (redirectLeft <= 0) {
+            reject(new Error("too many redirects"));
+            res.resume();
+            return;
+          }
+          const next = new URL(res.headers.location, url).href;
+          res.resume();
+          fetchTextWithHttps(next, redirectLeft - 1).then(resolve, reject);
           return;
         }
         if ((res.statusCode ?? 500) >= 400) {
@@ -129,155 +93,274 @@ function fetchTextWithHttps(url) {
       }
     );
     req.on("error", reject);
-    req.setTimeout(60000, () => {
-      req.destroy(new Error(`timeout ${url}`));
-    });
+    req.setTimeout(45000, () => req.destroy(new Error(`timeout ${url}`)));
   });
 }
 
 async function fetchText(url) {
   try {
     return fetchTextWithCurl(url);
-  } catch (curlErr) {
+  } catch (e1) {
     try {
       return await fetchTextWithHttps(url);
-    } catch (httpsErr) {
-      throw new Error(
-        `${url} failed (curl: ${curlErr?.message ?? curlErr}; https: ${httpsErr?.message ?? httpsErr})`
-      );
+    } catch (e2) {
+      throw new Error(`${url} failed (${e1.message}; ${e2.message})`);
     }
   }
 }
 
-function parseTags(text) {
-  const found = new Map();
-  const htmlRe = /\/PCL-N-Edition\/PCL-N\/releases\/tag\/([^"'?\s#]+)/gi;
-  let m;
-  while ((m = htmlRe.exec(text)) !== null) {
-    const tag = decodeURIComponent(m[1]);
-    if (!found.has(tag)) found.set(tag, tag);
-  }
-  const atomRe =
-    /<entry>[\s\S]*?<link[^>]+href="[^"]*\/releases\/tag\/([^"]+)"[\s\S]*?<title>([^<]*)<\/title>[\s\S]*?<\/entry>/gi;
-  while ((m = atomRe.exec(text)) !== null) {
-    found.set(decodeURIComponent(m[1]), decodeHtmlEntities(m[2].trim()));
-  }
-  return [...found.entries()].map(([tag, title]) => ({ tag, title }));
+function normalizeVersion(value) {
+  let trimmed = String(value || "").trim();
+  if (trimmed.startsWith("v") || trimmed.startsWith("V")) trimmed = trimmed.slice(1);
+  const plus = trimmed.indexOf("+");
+  if (plus >= 0) trimmed = trimmed.slice(0, plus);
+  trimmed = trimmed.replace(/_/g, "-");
+  const space = trimmed.indexOf(" ");
+  if (space > 0) trimmed = trimmed.slice(0, space) + "-" + trimmed.slice(space + 1).replace(/ /g, "-");
+  return trimmed;
 }
 
-function parseAssets(tag, html) {
-  const assets = [];
-  const seen = new Set();
-  const re = /\/PCL-N-Edition\/PCL-N\/releases\/download\/([^/"'\s]+)\/([^"'?\s#]+)/gi;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const name = decodeURIComponent(m[2]);
-    if (!isPackageAsset(name) || seen.has(name)) continue;
-    seen.add(name);
-    assets.push({
-      name,
-      browser_download_url: `${GH}/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`
+function isCiTag(tag) {
+  return String(tag).toLowerCase() === CI_TAG;
+}
+
+function isBetaTag(tag) {
+  if (isCiTag(tag)) return false;
+  const n = normalizeVersion(tag).toLowerCase();
+  return (
+    n.includes("beta") ||
+    n.includes("-rc") ||
+    n.includes("preview") ||
+    // bare "pre" but not "release"
+    (/\bpre\b/.test(n) && !n.includes("release"))
+  );
+}
+
+function isStableTag(tag) {
+  if (isCiTag(tag)) return false;
+  const n = normalizeVersion(tag);
+  return !isBetaTag(tag) && !n.toLowerCase().includes("alpha");
+}
+
+function detectChannel(tag) {
+  if (isCiTag(tag)) return "ci";
+  if (isBetaTag(tag)) return "beta";
+  if (isStableTag(tag)) return "release";
+  return "release";
+}
+
+/** Same ranking spirit as LauncherUpdateService.CompareVersions (for sorting history). */
+function compareVersionsDesc(left, right) {
+  const ln = normalizeVersion(left);
+  const rn = normalizeVersion(right);
+  const core = v => {
+    const i = v.search(/[-+]/);
+    return i >= 0 ? v.slice(0, i) : v;
+  };
+  const pre = v => {
+    const i = v.search(/[-+]/);
+    return i >= 0 ? v.slice(i + 1).toLowerCase() : "";
+  };
+  const lc = core(ln);
+  const rc = core(rn);
+  const parse = s => {
+    const p = s.split(".").map(x => parseInt(x, 10) || 0);
+    while (p.length < 3) p.push(0);
+    return p;
+  };
+  const a = parse(lc);
+  const b = parse(rc);
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return b[i] - a[i];
+  }
+  const lp = pre(ln);
+  const rp = pre(rn);
+  const rank = p => {
+    if (!p || p === "release") return 3;
+    if (p.startsWith("rc")) return 2;
+    if (p.includes("beta")) return 1;
+    if (p.includes("ci")) return 0;
+    return 1;
+  };
+  const lr = rank(lp);
+  const rr = rank(rp);
+  if (lr !== rr) return rr - lr;
+  return rp.localeCompare(lp, undefined, { numeric: true });
+}
+
+function labelFor(tag, channel, title) {
+  if (channel === "ci") {
+    const sha = title?.match(/[0-9a-f]{7,40}/i)?.[0];
+    return sha ? `CI ${sha.slice(0, 7)}` : "CI latest";
+  }
+  const core = normalizeVersion(tag).replace(/-(release|beta|rc\d*)$/i, "");
+  return channel === "beta" ? `${core} Beta` : core;
+}
+
+/**
+ * Host-only packages since ~1.3.6; older builds used WithPlugin/NoPlugin suffix.
+ * Mirrors product history observed on GitHub assets.
+ */
+function supportsPluginChoice(tag) {
+  if (isCiTag(tag)) return false;
+  const core = normalizeVersion(tag).split("-")[0];
+  const m = core.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return true;
+  const major = +m[1];
+  const minor = +m[2];
+  const patch = +m[3];
+  if (major > 1) return false;
+  if (major === 1 && minor > 3) return false;
+  if (major === 1 && minor === 3 && patch >= 6) return false;
+  return true;
+}
+
+function parseAtomFeed(xml) {
+  const entries = [];
+  const entryRe = /<entry>([\s\S]*?)<\/entry>/gi;
+  let em;
+  while ((em = entryRe.exec(xml)) !== null) {
+    const block = em[1];
+    const href =
+      block.match(/<link[^>]+href="([^"]+)"/i)?.[1] ||
+      [...block.matchAll(/<link[^>]+href="([^"]+)"/gi)].map(x => x[1]).find(Boolean);
+    let tag = null;
+    if (href) {
+      const tm = href.match(/\/releases\/tag\/([^/?#\s"]+)/i);
+      if (tm) tag = decodeURIComponent(tm[1]);
+    }
+    if (!tag) {
+      const id = block.match(/<id>([^<]+)<\/id>/i)?.[1];
+      if (id) {
+        const slash = id.lastIndexOf("/");
+        if (slash >= 0) tag = id.slice(slash + 1);
+      }
+    }
+    if (!tag) continue;
+    const title = block.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim() || tag;
+    const updated = block.match(/<updated>([^<]*)<\/updated>/i)?.[1] || undefined;
+    entries.push({
+      tag,
+      title: title
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"'),
+      htmlUrl: href || `${GH}/${OWNER}/${REPO}/releases/tag/${encodeURIComponent(tag)}`,
+      updated
     });
   }
-  return assets;
+  return entries;
+}
+
+function resolveLatestStableTagFromHeaders(headerText) {
+  // Prefer Location (no-follow). Also scan full header blob for /releases/tag/.
+  const loc = headerText.match(/^(?:location|Location):\s*(\S+)/m)?.[1];
+  const candidates = [loc, ...[...headerText.matchAll(/https:\/\/github\.com\/[^\s]+/g)].map(m => m[0])];
+  for (const c of candidates) {
+    if (!c) continue;
+    const m = c.match(/\/releases\/tag\/([^/?#\s]+)/i);
+    if (m) return decodeURIComponent(m[1]);
+  }
+  return null;
 }
 
 async function main() {
-  const merged = new Map();
+  const atomUrl = `${GH}/${OWNER}/${REPO}/releases.atom`;
+  console.log("Fetching Atom (same as LauncherUpdateService.FetchReleaseFeedAsync)…");
+  const atomXml = await fetchText(atomUrl);
+  const feed = parseAtomFeed(atomXml);
+  console.log(`Atom entries: ${feed.length}`);
 
+  let stableTag = null;
   try {
-    for (const item of parseTags(await fetchText(`${GH}/${REPO}/releases.atom`))) {
-      merged.set(item.tag, item.title);
+    console.log("Resolving /releases/latest (same as ResolveLatestStableTagAsync)…");
+    const headers = fetchHeadersWithCurl(`${GH}/${OWNER}/${REPO}/releases/latest`);
+    stableTag = resolveLatestStableTagFromHeaders(headers);
+    // Some curl builds follow redirects with -I; also try no-follow explicitly.
+    if (!stableTag) {
+      const headers2 = execFileSync(
+        "curl",
+        ["-sI", "--max-redirs", "0", "-A", "PCL-N/1.0", `${GH}/${OWNER}/${REPO}/releases/latest`],
+        { encoding: "utf8" }
+      );
+      stableTag = resolveLatestStableTagFromHeaders(headers2);
     }
+    console.log(`stable tag from latest redirect: ${stableTag ?? "(none)"}`);
   } catch (e) {
-    console.warn("atom:", e.message);
+    console.warn("latest redirect:", e.message);
   }
 
-  for (const page of [1, 2, 3, 4, 5]) {
-    try {
-      const url = page === 1 ? `${GH}/${REPO}/releases` : `${GH}/${REPO}/releases?page=${page}`;
-      const batch = parseTags(await fetchText(url));
-      if (!batch.length) break;
-      for (const item of batch) if (!merged.has(item.tag)) merged.set(item.tag, item.title);
-      if (batch.length < 5) break;
-    } catch (e) {
-      console.warn(`releases page ${page}:`, e.message);
-      break;
-    }
+  const byTag = new Map();
+  for (const e of feed) {
+    if (!byTag.has(e.tag)) byTag.set(e.tag, e);
   }
-
-  if (!merged.has("ci-latest")) merged.set("ci-latest", "CI latest");
-
-  const tags = [...merged.entries()]
-    .map(([tag, title]) => ({ tag, title }))
-    .sort((a, b) => compareTagsDesc(a.tag, b.tag));
-
-  console.log(`Found ${tags.length} tags from GitHub web pages`);
+  if (stableTag && !byTag.has(stableTag)) {
+    byTag.set(stableTag, {
+      tag: stableTag,
+      title: stableTag,
+      htmlUrl: `${GH}/${OWNER}/${REPO}/releases/tag/${encodeURIComponent(stableTag)}`
+    });
+  }
+  if (!byTag.has(CI_TAG)) {
+    byTag.set(CI_TAG, {
+      tag: CI_TAG,
+      title: "CI rolling build",
+      htmlUrl: `${GH}/${OWNER}/${REPO}/releases/tag/${CI_TAG}`
+    });
+  }
 
   const versions = [];
-  const concurrency = 6;
-  for (let i = 0; i < tags.length; i += concurrency) {
-    const chunk = tags.slice(i, i + concurrency);
-    const results = await Promise.all(
-      chunk.map(async item => {
-        const channel = detectChannel(item.tag);
-        if (!channel) return null;
-        let packageAssets = [];
-        try {
-          packageAssets = parseAssets(
-            item.tag,
-            await fetchText(`${GH}/${REPO}/releases/expanded_assets/${encodeURIComponent(item.tag)}`)
-          );
-        } catch (e) {
-          console.warn(`assets ${item.tag}:`, e.message);
-        }
-        if (packageAssets.length === 0 && channel !== "ci") return null;
-        return {
-          id: item.tag,
-          label: labelFor(item.tag, channel, item.title),
-          tag: item.tag,
-          channel,
-          packaging: packagingOf(packageAssets),
-          supportsPluginChoice: supportsPluginChoice(packageAssets),
-          packageAssets
-        };
-      })
-    );
-    for (const v of results) if (v) versions.push(v);
-    process.stdout.write(`\rprobed ${Math.min(i + concurrency, tags.length)}/${tags.length}`);
-  }
-  console.log("");
-
-  versions.sort((a, b) => {
-    const order = { release: 0, beta: 1, ci: 2 };
-    if (a.channel !== b.channel) return order[a.channel] - order[b.channel];
-    return compareTagsDesc(a.tag, b.tag);
-  });
-
-  if (!versions.some(v => v.channel === "ci")) {
+  for (const e of byTag.values()) {
+    const channel = detectChannel(e.tag);
     versions.push({
-      id: "ci-latest",
-      label: "CI latest",
-      tag: "ci-latest",
-      channel: "ci",
+      id: e.tag,
+      label: labelFor(e.tag, channel, e.title),
+      tag: e.tag,
+      channel,
+      // packaging/legacy is cosmetic; download URL uses BuildFullPackage convention
       packaging: "legacy",
-      supportsPluginChoice: false,
+      supportsPluginChoice: supportsPluginChoice(e.tag),
+      publishedAt: e.updated,
+      // Intentionally empty: LauncherUpdateService builds URLs by convention.
       packageAssets: []
     });
   }
 
+  // Sort: keep feed order preference within channel via CompareVersions desc
+  const order = { release: 0, beta: 1, ci: 2 };
+  versions.sort((a, b) => {
+    if (a.channel !== b.channel) return order[a.channel] - order[b.channel];
+    if (a.channel === "ci") return 0;
+    return compareVersionsDesc(a.tag, b.tag);
+  });
+
+  // Ensure stable from /releases/latest is first in release channel
+  if (stableTag) {
+    const idx = versions.findIndex(v => v.tag === stableTag);
+    if (idx > 0 && versions[idx].channel === "release") {
+      const [item] = versions.splice(idx, 1);
+      const insertAt = versions.findIndex(v => v.channel === "release");
+      versions.splice(insertAt < 0 ? 0 : insertAt, 0, item);
+    }
+  }
+
   const payload = {
     generatedAt: new Date().toISOString(),
-    source: "github-web-html",
+    source: "github-atom+latest-redirect+convention-urls",
+    owner: OWNER,
+    repo: REPO,
+    stableTagFromLatest: stableTag,
     versions
   };
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(payload, null, 2) + "\n", "utf8");
-  console.log(`Wrote ${versions.length} versions -> ${outPath}`);
+
   const beta = versions.find(v => v.channel === "beta");
   const release = versions.find(v => v.channel === "release");
-  console.log(`latest beta=${beta?.tag ?? "—"} release=${release?.tag ?? "—"}`);
+  console.log(`Wrote ${versions.length} versions -> ${outPath}`);
+  console.log(`latest beta=${beta?.tag ?? "—"} release=${release?.tag ?? "—"} ci=${CI_TAG}`);
 }
 
 main().catch(err => {
