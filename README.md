@@ -69,12 +69,29 @@ pnpm build:prod
 
 推送 `master` 触发 `.github/workflows/cloudflare-pages.yml`。
 
-仓库 Secrets：
+仓库 **Actions secrets**（Settings → Secrets and variables → Actions → Repository secrets）：
 
 | Secret | 说明 |
 |--------|------|
-| `CLOUDFLARE_API_TOKEN` | 具备 **Cloudflare Pages — Edit** 的 API Token |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
+| `CLOUDFLARE_API_TOKEN` | 见下方「API Token 权限」 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 右侧栏 Account ID（Workers & Pages 页） |
+
+#### API Token 权限（必读）
+
+失败日志若出现 `Authentication error [code: 10000]`，说明 Token **能登录但无权操作 Pages**。
+
+在 https://dash.cloudflare.com/profile/api-tokens 用 **Create Custom Token**：
+
+| 类型 | 权限 |
+|------|------|
+| Account | **Cloudflare Pages — Edit** |
+| Account | **Account Settings — Read** |
+| User | **User Details — Read** |
+| User | **Memberships — Read** |
+
+- **Account Resources**：Include → 选中你的账号（不要用 Zone 级 token）
+- 创建后整段粘贴为 `CLOUDFLARE_API_TOKEN`（只显示一次）
+- Account ID 在 Workers & Pages 概览右侧，32 位十六进制
 
 可选 Variables（覆盖 `.env.production` 内嵌值）：
 
