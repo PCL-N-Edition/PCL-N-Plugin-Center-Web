@@ -60,8 +60,18 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=pcl-n-web --branch=master --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID repository secrets."
+            echo "Create an API token with Account → Cloudflare Pages → Edit, then add both secrets."
+            exit 1
+          fi
+          npx --yes wrangler@4 pages deploy dist \
+            --project-name=pcl-n-web \
+            --branch=master \
+            --commit-dirty=true
+          # Expose a stable dashboard URL for the environment (custom domains are preferred).
+          echo "deployment-url=https://pcln.top" >> "$GITHUB_OUTPUT"
