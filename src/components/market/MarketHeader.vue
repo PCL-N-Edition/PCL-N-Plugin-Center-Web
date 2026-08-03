@@ -36,9 +36,9 @@ const route = useRoute();
 const userStore = useUserStore();
 const globalStore = useGlobalStore();
 const { t, locale } = useI18n();
-// Same-origin history login on the store host (never #/login; never bare auth /login without SPA files).
+// Login always lives on auth.pcln.top (history path; CF Pages SPA + static shells).
 const authHref = computed(
-  () => `https://pcln.top/login/?redirect=${encodeURIComponent(route.fullPath || "/")}`
+  () => `https://auth.pcln.top/login/?redirect=${encodeURIComponent(route.fullPath || "/")}`
 );
 type ThemeMode = "system" | "light" | "dark";
 const themeMode = ref<ThemeMode>((localStorage.getItem("pcln-market-theme") as ThemeMode) || "system");

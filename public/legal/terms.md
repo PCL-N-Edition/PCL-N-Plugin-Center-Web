@@ -5,7 +5,8 @@
 **生效日期：** 2026 年 7 月 28 日  
 **运营者：** MUXUE1230（个人开发者）  
 **联系方式：** GitHub Issues（https://github.com/PCL-N-Edition/PCL-N/issues）  
-**服务入口：** https://pcln.top/ （认证辅助域名可能包括 auth.pcln.top）
+**服务入口：** https://pcln.top/  
+**身份认证入口：** https://auth.pcln.top/ （登录、协议确认与 OAuth 回跳）
 
 ## 一、协议范围与接受
 

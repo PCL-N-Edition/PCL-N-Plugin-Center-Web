@@ -43,9 +43,17 @@ import {
   legalDocumentUrls
 } from "@/utils/legal";
 import { LOGIN_URL } from "@/config";
+import {
+  handoffSessionToStore,
+  isAuthHost,
+  isLocalAuthHost,
+  replaceWithAuthLogin
+} from "@/utils/authHosts";
+import useUserStore from "@/stores/modules/user";
 
 const router = useRouter();
 const route = useRoute();
+const userStore = useUserStore();
 const accepted = ref(false);
 const version = NCLOUD_LEGAL_VERSION;
 const urls = legalDocumentUrls;
@@ -59,12 +67,20 @@ const confirm = async () => {
   const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
     ? route.query.redirect
     : "/market";
+  if (isAuthHost() && !isLocalAuthHost() && userStore.token) {
+    await handoffSessionToStore(redirect);
+    return;
+  }
   await router.replace(redirect);
 };
 
 const decline = async () => {
   ElMessage.info("未同意协议，无法使用需要登录的 N Cloud 功能");
-  await router.replace(LOGIN_URL);
+  if (isAuthHost() || isLocalAuthHost()) {
+    await router.replace(LOGIN_URL);
+    return;
+  }
+  replaceWithAuthLogin("/");
 };
 </script>
 

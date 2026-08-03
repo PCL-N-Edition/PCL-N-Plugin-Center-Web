@@ -3,8 +3,9 @@ import useAuthStore from "@/stores/modules/auth.ts";
 import { LOGIN_URL } from "@/config/index.ts";
 import { koiMsgWarning } from "@/utils/koi.ts";
 import router from "@/routers/index";
+import { isLocalAuthHost, isPrimaryStoreHost, replaceWithAuthLogin } from "@/utils/authHosts";
 
-/** 菜单/权限异常：清空 token 与权限缓存，回登录页 */
+/** 菜单/权限异常：清空 token 与权限缓存，回登录页（生产走 auth.pcln.top） */
 export const forceRelogin = async (message?: string) => {
   const userStore = useUserStore();
   const authStore = useAuthStore();
@@ -12,6 +13,10 @@ export const forceRelogin = async (message?: string) => {
   authStore.$reset();
   if (message) {
     koiMsgWarning(message);
+  }
+  if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+    replaceWithAuthLogin(router.currentRoute.value.fullPath || "/");
+    return;
   }
   await router.replace(LOGIN_URL);
 };

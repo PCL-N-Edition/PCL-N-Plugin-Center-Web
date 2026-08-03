@@ -56,6 +56,13 @@ export const layoutRouter: RouteRecordRaw[] = [
     name: "legalAccept",
     component: () => import("@/views/legal/accept.vue"),
     meta: { title: "用户协议" }
+  },
+  {
+    // Session handoff landing on pcln.top after OAuth on auth.pcln.top.
+    path: "/auth/callback",
+    name: "authCallback",
+    component: () => import("@/views/auth/callback.vue"),
+    meta: { title: "登录回跳" }
   }
 ];
 

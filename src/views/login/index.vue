@@ -61,7 +61,7 @@
           <span>前端仅使用 Supabase Publishable Key；管理写入由受保护 API 完成。</span>
         </div>
         <div class="login-links">
-          <a href="https://pcln.top/#/market">浏览插件市场</a>
+          <a href="https://pcln.top/market/">浏览插件市场</a>
           <a href="https://docs.pcln.top/" target="_blank" rel="noreferrer">插件开发文档</a>
           <a href="https://github.com/PCL-N-Edition/PCL-N-Plugin-Center-Web" target="_blank" rel="noreferrer">
             查看开源管理端
@@ -86,6 +86,12 @@ import {
   hasAcceptedNCloudLegal,
   legalDocumentUrls
 } from "@/utils/legal";
+import {
+  buildOAuthRedirectTo,
+  handoffSessionToStore,
+  isAuthHost,
+  isLocalAuthHost
+} from "@/utils/authHosts";
 
 const router = useRouter();
 const route = useRoute();
@@ -95,9 +101,15 @@ const errorMessage = ref("");
 const acceptedLegal = ref(hasAcceptedNCloudLegal());
 const legalVersion = NCLOUD_LEGAL_VERSION;
 const legalUrls = legalDocumentUrls;
-const PRIMARY_STORE_ORIGIN = "https://pcln.top";
-const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
-const isPrimaryStoreHost = () => ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
+
+const resolvePostLoginRedirect = () => {
+  const storedRedirect = sessionStorage.getItem("pcln-login-redirect");
+  return typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
+    ? route.query.redirect
+    : storedRedirect?.startsWith("/")
+      ? storedRedirect
+      : HOME_URL;
+};
 
 onMounted(async () => {
   const storedOAuthError = sessionStorage.getItem("pcln-oauth-error");
@@ -127,11 +139,13 @@ onMounted(async () => {
   try {
     await userStore.restoreSession(true);
     if (userStore.token) {
-      const storedRedirect = sessionStorage.getItem("pcln-login-redirect");
-      const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
-        ? route.query.redirect
-        : storedRedirect?.startsWith("/") ? storedRedirect : HOME_URL;
+      const redirect = resolvePostLoginRedirect();
       sessionStorage.removeItem("pcln-login-redirect");
+      // Production: login UI lives on auth; hand session to pcln.top.
+      if (isAuthHost() && !isLocalAuthHost()) {
+        await handoffSessionToStore(redirect);
+        return;
+      }
       await router.replace(redirect);
       return;
     }
@@ -161,36 +175,17 @@ const signIn = async (provider: "github" | "azure") => {
   errorMessage.value = "";
   const target = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
     ? route.query.redirect
-    : "/";
+    : "/market";
 
-  // OAuth always starts/returns on the primary store with history paths (…/login/?…, not #/login).
-  // auth.pcln.top GH Pages may lack /login/index.html and would 404 on deep links.
-  if (isAuthHost()) {
-    const oauthStart = new URL(import.meta.env.BASE_URL || "/", PRIMARY_STORE_ORIGIN);
-    const basePath = oauthStart.pathname.replace(/\/$/, "");
-    oauthStart.pathname = `${basePath}/login/`.replace(/\/{2,}/g, "/");
-    oauthStart.search = `?provider=${provider}&redirect=${encodeURIComponent(target)}`;
-    oauthStart.hash = "";
-    window.location.assign(oauthStart.toString());
-    return;
-  }
-
-  const callbackOrigin = isPrimaryStoreHost() ? PRIMARY_STORE_ORIGIN : window.location.origin;
-  const redirectTo = new URL(import.meta.env.BASE_URL || "/", callbackOrigin);
-  const basePath = redirectTo.pathname.replace(/\/$/, "");
-  const appPath = target.startsWith("/") ? target : `/${target}`;
-  // OAuth return URL uses clean history path (e.g. https://pcln.top/market/), not #/market.
-  const pathAndQuery = appPath.split("?");
-  let pathname = `${basePath}${pathAndQuery[0]}`.replace(/\/{2,}/g, "/") || "/";
-  if (!pathname.endsWith("/") && !pathname.split("/").pop()?.includes(".")) {
-    pathname = `${pathname}/`;
-  }
-  redirectTo.pathname = pathname;
-  redirectTo.search = pathAndQuery[1] ? `?${pathAndQuery[1]}` : "";
-  redirectTo.hash = "";
+  // PKCE: start + callback must be same origin → auth.pcln.top/login in production.
+  const redirectTo = buildOAuthRedirectTo(target);
+  sessionStorage.setItem("pcln-login-redirect", target);
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: redirectTo.toString(), scopes: provider === "azure" ? "profile email offline_access XboxLive.signin" : undefined }
+    options: {
+      redirectTo,
+      scopes: provider === "azure" ? "profile email offline_access XboxLive.signin" : undefined
+    }
   });
   if (error) {
     errorMessage.value = error.message;

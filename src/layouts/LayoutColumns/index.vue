@@ -132,6 +132,7 @@ import useTabsStore from "@/stores/modules/tabs.ts";
 import useKeepAliveStore from "@/stores/modules/keepAlive.ts";
 import { User } from "@element-plus/icons-vue";
 import logo from "@/assets/images/logo/logo.webp";
+import { isLocalAuthHost, isPrimaryStoreHost, replaceWithAuthLogin } from "@/utils/authHosts";
 
 const route = useRoute();
 const router = useRouter();
@@ -319,7 +320,11 @@ const handleLayout = async () => {
   keepAliveStore.$reset();
   // 清除 auth store 数据[重置为初始状态]
   authStore.$reset();
-  // 退出登录，必须使用replace把页面缓存刷掉。
+  // 退出登录，必须使用replace把页面缓存刷掉。生产登录在 auth.pcln.top。
+  if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+    replaceWithAuthLogin("/");
+    return;
+  }
   window.location.replace(LOGIN_URL);
 };
 

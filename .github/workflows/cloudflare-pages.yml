@@ -1,0 +1,67 @@
+name: Deploy Cloudflare Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare-pages
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production site
+        # Uses committed .env.production (public publishable keys only).
+        # Optional repo Variables override when non-empty — set in Settings → Variables.
+        run: |
+          if [ -n "${{ vars.VITE_SUPABASE_URL }}" ]; then
+            export VITE_SUPABASE_URL='${{ vars.VITE_SUPABASE_URL }}'
+          fi
+          if [ -n "${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
+            export VITE_SUPABASE_PUBLISHABLE_KEY='${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}'
+          fi
+          if [ -n "${{ vars.VITE_WEB_BASE_API }}" ]; then
+            export VITE_WEB_BASE_API='${{ vars.VITE_WEB_BASE_API }}'
+          fi
+          pnpm build:prod
+
+      - name: Verify SPA hosting files
+        run: |
+          test -f dist/index.html
+          test -f dist/_redirects
+          test -f dist/login/index.html
+          test -f dist/auth/callback/index.html
+          echo "Cloudflare Pages artifact OK"
+          ls -la dist | head -n 40
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=pcl-n-web --branch=master --commit-dirty=true

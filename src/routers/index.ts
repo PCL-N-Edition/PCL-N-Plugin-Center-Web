@@ -11,6 +11,18 @@ import { useDebounceFn } from '@vueuse/core';
 import { initDynamicRouter, isDynamicRoutesMissing } from "@/routers/modules/dynamicRouter.ts";
 import { getMenuLanguage } from "@/utils/index.ts";
 import { completeOAuthCallback } from "@/lib/supabase";
+import {
+  PRIMARY_STORE_ORIGIN,
+  buildExternalRoute,
+  consumeStoreAuthHandoff,
+  handoffSessionToStore,
+  isAuthHost,
+  isAuthOnlyPath,
+  isLocalAuthHost,
+  isPrimaryStoreHost,
+  replaceExternalRoute,
+  replaceWithAuthLogin
+} from "@/utils/authHosts";
 
 const normalizeOAuthErrorRedirect = () => {
   const currentUrl = new URL(window.location.href);
@@ -35,48 +47,6 @@ normalizeOAuthErrorRedirect();
 // .env配置文件读取 — login/auth always use history paths (no #).
 const mode = import.meta.env.VITE_ROUTER_MODE;
 const useHashRouter = mode === "hash";
-const PRIMARY_STORE_ORIGIN = "https://pcln.top";
-// Prefer same-origin login on the store host (reliable SPA files).
-// auth.pcln.top remains for OAuth callback / dedicated auth branding when already there.
-const AUTH_ORIGIN = "https://auth.pcln.top";
-
-const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
-const isPrimaryStoreHost = () =>
-  ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
-
-/** Build absolute URL with history paths (never hash), for login / cross-host redirects. */
-const buildExternalRoute = (origin: string, route: string) => {
-  const base = new URL(import.meta.env.BASE_URL || "/", origin);
-  const normalizedRoute = route.startsWith("/") ? route : `/${route}`;
-  const routeUrl = new URL(normalizedRoute, base.origin);
-  // Keep site base path if any, then append app route.
-  const basePath = base.pathname.replace(/\/$/, "") || "";
-  const appPath = routeUrl.pathname.startsWith("/") ? routeUrl.pathname : `/${routeUrl.pathname}`;
-  // Trailing slash helps GitHub Pages resolve directory/index.html.
-  let pathname = `${basePath}${appPath}`.replace(/\/{2,}/g, "/") || "/";
-  if (!pathname.endsWith("/") && !pathname.split("/").pop()?.includes(".")) {
-    pathname = `${pathname}/`;
-  }
-  base.pathname = pathname;
-  base.search = routeUrl.search;
-  base.hash = "";
-  return base;
-};
-
-const replaceExternalRoute = (origin: string, route: string) => {
-  window.location.replace(buildExternalRoute(origin, route).toString());
-};
-
-const replaceWithAuth = (redirect: string) => {
-  // Use primary store /login/ (history + SPA shell). auth.pcln.top historically
-  // only had root index.html; /login 404'd on GitHub Pages without a materialised route.
-  const loginOrigin = isAuthHost() ? AUTH_ORIGIN : PRIMARY_STORE_ORIGIN;
-  const target = buildExternalRoute(
-    loginOrigin,
-    `/login?redirect=${encodeURIComponent(redirect)}`
-  );
-  window.location.replace(target.toString());
-};
 
 // Preserve links issued by previous hash-router deployments while exposing
 // clean, indexable URLs to search engines and new navigation.
@@ -110,6 +80,13 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
   const authStore = useAuthStore();
 
   try {
+    // Store host: absorb session handoff from auth.pcln.top before other guards.
+    const handoffRedirect = await consumeStoreAuthHandoff();
+    if (handoffRedirect) {
+      await userStore.restoreSession(true);
+      return handoffRedirect;
+    }
+
     await completeOAuthCallback();
     await userStore.restoreSession();
   } catch (error) {
@@ -122,46 +99,43 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
   // 2、标题切换，没有放置后置路由，是因为页面路径不存在，title会变成undefined
   document.title = getMenuLanguage(to.meta?.title as string) || "PCL.N 插件中心";
 
-  // 3、判断是访问登录页，有Token访问当前页面，token过期访问接口，axios封装则自动跳转登录页面，没有Token重置路由到登陆页。
+  // 3、登录页：生产环境统一在 auth.pcln.top；主站仅重定向过去。
   if (to.path.toLocaleLowerCase() === LOGIN_URL) {
-    // 有Token访问当前页面，重定向到之前访问的页面或首页
     if (userStore.token) {
       const requestedRedirect = typeof to.query.redirect === "string" && to.query.redirect.startsWith("/")
         ? to.query.redirect
         : from.fullPath && from.fullPath !== LOGIN_URL ? from.fullPath : "/market";
-      if (isAuthHost()) {
-        replaceExternalRoute(PRIMARY_STORE_ORIGIN, requestedRedirect);
+      if (isAuthHost() && !isLocalAuthHost()) {
+        await handoffSessionToStore(requestedRedirect);
         return false;
       }
       return requestedRedirect;
     }
-    const oauthProvider = to.query.provider;
-    const isOAuthStart = oauthProvider === "github" || oauthProvider === "azure";
-    if (isPrimaryStoreHost() && isOAuthStart) {
-      return true;
-    }
-    if (isPrimaryStoreHost()) {
+    // Primary store must not host the login UI.
+    if (isPrimaryStoreHost() && !isLocalAuthHost()) {
       const requestedRedirect = typeof to.query.redirect === "string" && to.query.redirect.startsWith("/")
         ? to.query.redirect
         : "/market";
-      replaceWithAuth(requestedRedirect);
+      replaceWithAuthLogin(requestedRedirect);
       return false;
     }
     // 登录页需要清空路由，否则会显示之前的路由。
     resetRouter();
-    return true; // 允许访问登录页
+    return true;
   }
 
   // 4、公开页（下载/市场/首页等）一律放行，不要求登录。
   if (isPublicRoutePath(to.path)) {
-    // auth 主机上的公开页：除 /login 外引导回主站对应路径（下载等不在 auth 上提供）
-    if (isAuthHost() && to.path.toLocaleLowerCase() !== LOGIN_URL) {
-      if (userStore.token) {
-        replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
+    if (isAuthHost() && !isLocalAuthHost()) {
+      // auth 只承载登录/协议；其余公开路径（下载、市场）回主站。
+      if (userStore.token && !isAuthOnlyPath(to.path)) {
+        await handoffSessionToStore(to.fullPath);
         return false;
       }
-      // 未登录访问 auth 上的非登录公开路径 → 主站
-      if (to.path !== "/" && to.path !== LOGIN_URL) {
+      if (!isAuthOnlyPath(to.path)) {
+        if (to.path === "/" || to.path === "") {
+          return { path: LOGIN_URL, replace: true };
+        }
         replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
         return false;
       }
@@ -169,22 +143,28 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
     return true;
   }
 
-  // auth.pcln.top 只承载身份认证。OAuth 完成后把目标路由交回主站。
-  if (isAuthHost()) {
+  // auth.pcln.top 只承载身份认证。登录后把会话移交主站。
+  if (isAuthHost() && !isLocalAuthHost()) {
     if (userStore.token) {
-      replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
+      if (to.path === "/legal/accept" && !hasAcceptedNCloudLegal()) {
+        return true;
+      }
+      await handoffSessionToStore(to.fullPath);
       return false;
+    }
+    if (isAuthOnlyPath(to.path)) {
+      return true;
     }
     return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true };
   }
 
   // 5、判断是否有 Token，没有重定向到 login 页面。
   if (!userStore.token) {
-    if (isPrimaryStoreHost()) {
-      replaceWithAuth(to.fullPath);
+    if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+      replaceWithAuthLogin(to.fullPath);
       return false;
     }
-    return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true }; // 重定向到登录页并保留目标
+    return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true };
   }
 
   // 5b、首次登录/注册后须同意 N Cloud 用户协议与隐私政策（版本见 legal.ts）。
@@ -206,10 +186,18 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
     try {
       await initDynamicRouter();
       if (!userStore.token) {
+        if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+          replaceWithAuthLogin(to.fullPath);
+          return false;
+        }
         return { path: LOGIN_URL, replace: true };
       }
       return { ...to, replace: true };
     } catch {
+      if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+        replaceWithAuthLogin(to.fullPath);
+        return false;
+      }
       return { path: LOGIN_URL, replace: true };
     }
   }
@@ -280,3 +268,6 @@ export const failFetchModule = useDebounceFn(() => {
 }, 1500);
 
 export default router;
+
+// Re-export for callers that previously imported helpers from the router module.
+export { buildExternalRoute, replaceExternalRoute, PRIMARY_STORE_ORIGIN };

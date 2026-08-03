@@ -29,7 +29,8 @@ export const ROUTER_WHITE_LIST: string[] = [
   "/market",
   "/market/**",
   "/legal/accept",
-  "/login"
+  "/login",
+  "/auth/callback"
 ];
 
 /** True for marketing/public pages that must never force login. */
@@ -43,6 +44,7 @@ export function isPublicRoutePath(path: string): boolean {
     normalized.startsWith("/market/") ||
     normalized === "/login" ||
     normalized === "/legal/accept" ||
+    normalized === "/auth/callback" ||
     normalized === "/500" ||
     normalized === "/403" ||
     normalized === "/404"

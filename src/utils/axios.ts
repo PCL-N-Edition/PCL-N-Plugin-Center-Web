@@ -16,6 +16,7 @@ import router from "@/routers/index.ts";
 import i18n from "@/languages/index.ts";
 import { ElMessageBox } from "element-plus";
 import { createThrottleAdapter } from "@/utils/axiosThrottle.ts";
+import { isLocalAuthHost, isPrimaryStoreHost, replaceWithAuthLogin } from "@/utils/authHosts";
 
 // axios配置[不含加密版本]
 const config = {
@@ -109,6 +110,10 @@ function handle401Unauthorized(data: any) {
             koiMsgError(i18n.global.t("msg.confirmLogin"));
             reject(i18n.global.t("button.confirm"));
             setTimeout(() => {
+              if (isPrimaryStoreHost() && !isLocalAuthHost()) {
+                replaceWithAuthLogin(router.currentRoute.value.fullPath || "/");
+                return;
+              }
               router.replace(LOGIN_URL).catch(err => {
                 console.error("路由跳转失败:", err);
                 window.location.href = LOGIN_URL;

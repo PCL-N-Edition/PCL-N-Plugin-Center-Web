@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T13:24:57.496Z",
+  "generatedAt": "2026-08-03T14:13:35.182Z",
   "source": "github-atom+latest-redirect+convention-urls",
   "owner": "PCL-N-Edition",
   "repo": "PCL-N",
@@ -21,7 +21,7 @@
       "channel": "beta",
       "packaging": "legacy",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-03T12:50:29Z",
+      "publishedAt": "2026-08-03T14:04:09Z",
       "packageAssets": []
     },
     {

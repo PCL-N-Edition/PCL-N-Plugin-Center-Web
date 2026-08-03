@@ -1,0 +1,12 @@
+# Cloudflare Pages project configuration.
+# Deploy: pnpm build:prod && wrangler pages deploy dist --project-name=pcl-n-web
+# Or push to master and let .github/workflows/cloudflare-pages.yml deploy.
+
+name = "pcl-n-web"
+compatibility_date = "2026-01-15"
+pages_build_output_dir = "dist"
+
+# Attach custom domains in the Cloudflare dashboard (already migrated):
+#   - pcln.top / www.pcln.top  → storefront
+#   - auth.pcln.top            → login / OAuth / legal
+# Both hostnames should point at this same Pages project.
