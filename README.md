@@ -69,12 +69,16 @@ pnpm build:prod
 
 推送 `master` 触发 `.github/workflows/cloudflare-pages.yml`。
 
-仓库 **Actions secrets**（Settings → Secrets and variables → Actions → Repository secrets）：
+**Secrets 位置（重要）：** 工作流使用 GitHub Environment `cloudflare-pages`。
+
+路径：仓库 **Settings → Environments → `cloudflare-pages` → Environment secrets**
 
 | Secret | 说明 |
 |--------|------|
 | `CLOUDFLARE_API_TOKEN` | 见下方「API Token 权限」 |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 右侧栏 Account ID（Workers & Pages 页） |
+
+也可放在 Repository secrets；当前部署 job 绑定了 Environment，优先读 Environment secrets。
 
 #### API Token 权限（必读）
 

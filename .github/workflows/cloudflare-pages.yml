@@ -16,9 +16,13 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Do not pin a GitHub Environment unless you intentionally store secrets there.
-    # Secrets must be repository Actions secrets (or this environment's secrets):
-    #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+    # Secrets live on the GitHub Environment (not only repo secrets):
+    # Settings → Environments → cloudflare-pages → Environment secrets
+    #   CLOUDFLARE_API_TOKEN
+    #   CLOUDFLARE_ACCOUNT_ID
+    environment:
+      name: cloudflare-pages
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - uses: actions/checkout@v6
 
@@ -35,7 +39,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build production site
-        # Uses committed .env.production (public publishable keys only).
         run: |
           if [ -n "${{ vars.VITE_SUPABASE_URL }}" ]; then
             export VITE_SUPABASE_URL='${{ vars.VITE_SUPABASE_URL }}'
@@ -64,30 +67,30 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::error::Missing repository secrets CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID."
-            echo "Add them under: Settings → Secrets and variables → Actions (repository secrets)."
+            echo "::error::Missing CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID."
+            echo "Add them as Environment secrets on the 'cloudflare-pages' environment:"
+            echo "  Settings → Environments → cloudflare-pages → Environment secrets"
+            echo "(Repository secrets also work if the job can read them.)"
             exit 1
           fi
           echo "Account ID length: ${#CLOUDFLARE_ACCOUNT_ID}"
           echo "Token length: ${#CLOUDFLARE_API_TOKEN}"
-          # Probe Pages API with the same token (clearer than wrangler alone).
           code=$(curl -sS -o /tmp/cf-pages.json -w "%{http_code}" \
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects?per_page=5" || true)
           echo "Pages projects API HTTP ${code}"
-          head -c 800 /tmp/cf-pages.json || true
+          head -c 1200 /tmp/cf-pages.json || true
           echo
           if [ "$code" != "200" ]; then
-            echo "::error::Cloudflare rejected this API token for Pages (HTTP ${code})."
-            echo "Recreate the token with ALL of these Account permissions:"
-            echo "  • Cloudflare Pages → Edit"
-            echo "  • Account Settings → Read"
-            echo "And User permissions:"
-            echo "  • User Details → Read"
-            echo "  • Memberships → Read"
-            echo "Account resources: Include → this account only (not zone-scoped)."
-            echo "Dashboard: https://dash.cloudflare.com/profile/api-tokens"
+            echo "::error::Token is present but Cloudflare Pages API returned HTTP ${code} (often auth 10000)."
+            echo "Recreate an Account API Token (not Zone token) with:"
+            echo "  Account → Cloudflare Pages → Edit"
+            echo "  Account → Account Settings → Read"
+            echo "  User → User Details → Read"
+            echo "  User → Memberships → Read"
+            echo "Account Resources: Include → your account"
+            echo "https://dash.cloudflare.com/profile/api-tokens"
             exit 1
           fi
 
