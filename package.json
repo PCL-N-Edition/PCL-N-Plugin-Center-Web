@@ -9,9 +9,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build",
-    "build:test": "vue-tsc && vite build --mode test",
-    "build:prod": "vue-tsc && vite build --mode production && node scripts/prepare-github-pages.mjs",
+    "fetch:releases": "node scripts/fetch-launcher-releases.mjs",
+    "build": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build",
+    "build:test": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode test",
+    "build:prod": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode production && node scripts/prepare-github-pages.mjs",
     "build:sites": "pnpm build:prod && node scripts/prepare-sites-build.mjs",
     "type:check": "vue-tsc --noEmit --skipLibCheck",
     "check": "pnpm type:check && pnpm build:prod",

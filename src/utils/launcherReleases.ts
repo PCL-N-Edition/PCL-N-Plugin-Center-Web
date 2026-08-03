@@ -1,6 +1,13 @@
 /**
- * Launcher release discovery from GitHub *web pages* (HTML / Atom), not the REST API.
- * Pages have no REST rate limit; listing uses releases HTML + atom, assets use expanded_assets HTML.
+ * Launcher release discovery — GitHub only (no REST API, no third-party / CF proxy).
+ *
+ * Runtime (browser):
+ *   1) same-origin /launcher-releases.json  (written at site build from GitHub HTML)
+ *   2) raw.githubusercontent.com catalog branch (optional, still GitHub)
+ *   3) built-in FALLBACK_VERSIONS
+ *
+ * Build time (Node, no CORS):
+ *   scripts/fetch-launcher-releases.mjs scrapes github.com HTML/Atom/expanded_assets.
  */
 
 export type ReleaseChannel = "release" | "beta" | "ci";
@@ -25,11 +32,15 @@ export interface ReleaseVersion {
 const REPO = "PCL-N-Edition/PCL-N";
 const GH = "https://github.com";
 
-const PACKAGE_ASSET = /^PCL_N_(Release|Beta|CI)_/i;
-const SKIP_ASSET = /\.(asc|sha256|hdiff|json)$/i;
+/** Same-origin catalog produced by scripts/fetch-launcher-releases.mjs */
+const LOCAL_CATALOG = `${import.meta.env.BASE_URL || "/"}launcher-releases.json`.replace(
+  /\/{2,}/g,
+  "/"
+);
 
-/** Optional same-origin proxy prefix, e.g. "/github-html" → /github-html/PCL-N-Edition/... */
-const HTML_PROXY = (import.meta.env.VITE_GITHUB_HTML_PROXY as string | undefined)?.replace(/\/$/, "") ?? "";
+/** Optional GitHub raw catalog (CORS-friendly, not REST API). */
+const RAW_CATALOG =
+  "https://raw.githubusercontent.com/PCL-N-Edition/PCL-N/download-catalog/downloads.json";
 
 export const FALLBACK_VERSIONS: ReleaseVersion[] = [
   {
@@ -84,34 +95,8 @@ export function detectChannel(tag: string): ReleaseChannel | null {
   if (!t) return null;
   if (/^ci(-|$)/i.test(t) || t.toLowerCase() === "ci-latest") return "ci";
   if (/-release$/i.test(t)) return "release";
-  if (/-beta$/i.test(t) || /-rc\d*$/i.test(t)) return "beta";
-  // Untagged prerelease-style names still map to beta when they contain "beta".
-  if (/beta/i.test(t)) return "beta";
+  if (/-beta$/i.test(t) || /-rc\d*$/i.test(t) || /beta/i.test(t)) return "beta";
   return "release";
-}
-
-function isPackageAsset(name: string): boolean {
-  if (SKIP_ASSET.test(name)) return false;
-  return PACKAGE_ASSET.test(name) || /Portable|Installer/i.test(name);
-}
-
-function packagingOf(assets: ReleaseAsset[]): Packaging {
-  if (assets.some(a => /_Installer\.|_Portable\./i.test(a.name))) return "v2";
-  return "legacy";
-}
-
-function supportsPluginChoice(assets: ReleaseAsset[]): boolean {
-  return assets.some(a => /_(WithPlugin|NoPlugin)(\.|_)/i.test(a.name));
-}
-
-function labelFor(tag: string, channel: ReleaseChannel, title?: string): string {
-  if (channel === "ci") {
-    const fromTitle = title?.match(/[0-9a-f]{7,40}/i)?.[0];
-    return fromTitle ? `CI ${fromTitle.slice(0, 7)}` : "CI latest";
-  }
-  const core = tag.replace(/^v/i, "").replace(/-release$/i, "").replace(/-beta$/i, "");
-  if (channel === "beta") return `${core} Beta`;
-  return core;
 }
 
 export function compareTagsDesc(a: string, b: string): number {
@@ -139,209 +124,74 @@ export function compareTagsDesc(a: string, b: string): number {
   return pb.pre.localeCompare(pa.pre, undefined, { numeric: true, sensitivity: "base" });
 }
 
-/** Resolve a fetch URL for a GitHub web path (not api.github.com). */
-function githubWebUrl(path: string): string {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  if (HTML_PROXY) return `${HTML_PROXY}${normalized}`;
-  return `${GH}${normalized}`;
+function normalizeVersion(raw: Partial<ReleaseVersion> & { tag?: string; id?: string }): ReleaseVersion | null {
+  const tag = (raw.tag || raw.id || "").trim();
+  if (!tag) return null;
+  const channel = (raw.channel as ReleaseChannel | undefined) ?? detectChannel(tag);
+  if (!channel) return null;
+  const packageAssets = Array.isArray(raw.packageAssets) ? raw.packageAssets : [];
+  return {
+    id: raw.id || tag,
+    label: raw.label || tag,
+    tag,
+    channel,
+    packaging: raw.packaging === "v2" ? "v2" : "legacy",
+    supportsPluginChoice: Boolean(raw.supportsPluginChoice),
+    publishedAt: raw.publishedAt,
+    packageAssets: packageAssets
+      .filter(a => a && typeof a.name === "string" && typeof a.browser_download_url === "string")
+      .map(a => ({
+        name: a.name,
+        browser_download_url: a.browser_download_url.startsWith("https://github.com/")
+          ? a.browser_download_url
+          : `${GH}/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(a.name)}`
+      }))
+  };
 }
 
-/**
- * Fetch GitHub HTML/Atom without the REST API.
- * 1) Direct (or same-origin HTML proxy)
- * 2) Fallback: r.jina.ai text mirror of the same page (no REST quota; browser CORS OK)
- */
-async function fetchGithubWebText(path: string, signal?: AbortSignal): Promise<string> {
-  const primary = githubWebUrl(path);
+async function loadJsonCatalog(url: string, signal?: AbortSignal): Promise<ReleaseVersion[] | null> {
   try {
-    const response = await fetch(primary, {
+    const response = await fetch(url, {
       cache: "no-cache",
       signal,
-      headers: { Accept: "text/html,application/xhtml+xml,application/atom+xml,text/plain,*/*" }
+      headers: { Accept: "application/json,text/plain,*/*" }
     });
-    if (response.ok) {
-      const text = await response.text();
-      if (text && text.length > 80) return text;
-    }
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { versions?: unknown[] } | unknown[];
+    const list = Array.isArray(payload) ? payload : payload.versions;
+    if (!Array.isArray(list) || !list.length) return null;
+    const versions = list
+      .map(item => normalizeVersion(item as Partial<ReleaseVersion>))
+      .filter((v): v is ReleaseVersion => v !== null);
+    return versions.length ? sortVersions(versions) : null;
   } catch {
-    // CORS or network — try reader mirror
-  }
-
-  // Unlimited-ish webpage reader mirror (not GitHub REST).
-  const absolute = `${GH}${path.startsWith("/") ? path : `/${path}`}`;
-  const mirror = `https://r.jina.ai/http://github.com${path.startsWith("/") ? path : `/${path}`}`;
-  const response = await fetch(mirror, {
-    cache: "no-cache",
-    signal,
-    headers: { Accept: "text/plain" }
-  });
-  if (!response.ok) throw new Error(`GitHub web fetch failed for ${absolute} (${response.status})`);
-  return await response.text();
-}
-
-/** Parse tags from releases HTML and/or Atom feed text. */
-export function parseReleaseTagsFromWeb(text: string): Array<{ tag: string; title: string }> {
-  const found = new Map<string, string>();
-
-  // HTML: /PCL-N-Edition/PCL-N/releases/tag/v1.3.19-beta
-  const htmlRe = /\/PCL-N-Edition\/PCL-N\/releases\/tag\/([^"'?\s#]+)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = htmlRe.exec(text)) !== null) {
-    const tag = decodeURIComponent(m[1]);
-    if (!found.has(tag)) found.set(tag, tag);
-  }
-
-  // Atom: <link ... href=".../releases/tag/v1.3.19-beta"/> + <title>
-  const atomEntryRe =
-    /<entry>[\s\S]*?<link[^>]+href="[^"]*\/releases\/tag\/([^"]+)"[\s\S]*?<title>([^<]*)<\/title>[\s\S]*?<\/entry>/gi;
-  while ((m = atomEntryRe.exec(text)) !== null) {
-    const tag = decodeURIComponent(m[1]);
-    const title = decodeHtmlEntities(m[2].trim());
-    found.set(tag, title || tag);
-  }
-
-  // jina markdown style: [PCL N v1.3.19 Beta](https://github.com/.../releases/tag/v1.3.19-beta)
-  const mdRe =
-    /\[([^\]]+)\]\(https?:\/\/github\.com\/PCL-N-Edition\/PCL-N\/releases\/tag\/([^)\s]+)\)/gi;
-  while ((m = mdRe.exec(text)) !== null) {
-    const title = m[1].trim();
-    const tag = decodeURIComponent(m[2]);
-    found.set(tag, title || tag);
-  }
-
-  return [...found.entries()].map(([tag, title]) => ({ tag, title }));
-}
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-/** Parse package asset links from expanded_assets HTML (or jina text of that page). */
-export function parseAssetsFromExpandedHtml(tag: string, html: string): ReleaseAsset[] {
-  const assets: ReleaseAsset[] = [];
-  const seen = new Set<string>();
-
-  // href="/PCL-N-Edition/PCL-N/releases/download/v1.3.19-beta/PCL_N_Beta_win-x64_SelfContained.zip"
-  const re =
-    /\/PCL-N-Edition\/PCL-N\/releases\/download\/([^/"'\s]+)\/([^"'?\s#]+)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const assetTag = decodeURIComponent(m[1]);
-    if (assetTag !== tag && assetTag !== encodeURIComponent(tag)) {
-      // still accept if page is for this tag
-    }
-    const name = decodeURIComponent(m[2]);
-    if (!isPackageAsset(name) || seen.has(name)) continue;
-    seen.add(name);
-    assets.push({
-      name,
-      browser_download_url: `${GH}/${REPO}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(name)}`
-    });
-  }
-
-  return assets;
-}
-
-async function loadTags(signal?: AbortSignal): Promise<Array<{ tag: string; title: string }>> {
-  const merged = new Map<string, string>();
-
-  // Atom first (compact, no REST quota).
-  try {
-    const atom = await fetchGithubWebText(`/${REPO}/releases.atom`, signal);
-    for (const item of parseReleaseTagsFromWeb(atom)) merged.set(item.tag, item.title);
-  } catch {
-    // continue
-  }
-
-  // HTML pages for deeper history (GitHub paginates ~10 per page).
-  for (const page of [1, 2, 3, 4]) {
-    try {
-      const path = page === 1 ? `/${REPO}/releases` : `/${REPO}/releases?page=${page}`;
-      const html = await fetchGithubWebText(path, signal);
-      const batch = parseReleaseTagsFromWeb(html);
-      if (!batch.length) break;
-      for (const item of batch) {
-        if (!merged.has(item.tag)) merged.set(item.tag, item.title);
-      }
-      // Stop early if page returned few tags (end of list).
-      if (batch.length < 5) break;
-    } catch {
-      break;
-    }
-  }
-
-  // Always include rolling CI tag.
-  if (!merged.has("ci-latest")) merged.set("ci-latest", "CI latest");
-
-  return [...merged.entries()].map(([tag, title]) => ({ tag, title }));
-}
-
-async function loadAssetsForTag(tag: string, signal?: AbortSignal): Promise<ReleaseAsset[]> {
-  try {
-    const html = await fetchGithubWebText(
-      `/${REPO}/releases/expanded_assets/${encodeURIComponent(tag)}`,
-      signal
-    );
-    return parseAssetsFromExpandedHtml(tag, html);
-  } catch {
-    return [];
+    return null;
   }
 }
 
-export async function fetchLauncherVersions(signal?: AbortSignal): Promise<ReleaseVersion[]> {
-  const tags = await loadTags(signal);
-  if (!tags.length) throw new Error("No release tags found on GitHub web pages.");
-
-  // Load assets for recent tags in parallel batches (web HTML, not API).
-  const ordered = [...tags].sort((a, b) => compareTagsDesc(a.tag, b.tag));
-  // Cap asset probes to keep first paint fast; history still listed with empty assets when needed.
-  const probeLimit = 36;
-  const toProbe = ordered.slice(0, probeLimit);
-
-  const versions: ReleaseVersion[] = [];
-  const concurrency = 6;
-  for (let i = 0; i < toProbe.length; i += concurrency) {
-    const chunk = toProbe.slice(i, i + concurrency);
-    const chunkResults = await Promise.all(
-      chunk.map(async item => {
-        const channel = detectChannel(item.tag);
-        if (!channel) return null;
-        const packageAssets = await loadAssetsForTag(item.tag, signal);
-        // Skip empty stubs (e.g. tag-only beta with no packages), keep CI.
-        if (packageAssets.length === 0 && channel !== "ci") return null;
-        return {
-          id: item.tag,
-          label: labelFor(item.tag, channel, item.title),
-          tag: item.tag,
-          channel,
-          packaging: packagingOf(packageAssets),
-          supportsPluginChoice: supportsPluginChoice(packageAssets),
-          packageAssets
-        } satisfies ReleaseVersion;
-      })
-    );
-    for (const v of chunkResults) if (v) versions.push(v);
-  }
-
-  // Older tags beyond probe window: still list if we only need history labels for dropdown
-  // of channels already covered — optional. Prefer only downloadable versions.
-  if (!versions.some(v => v.channel === "ci")) {
-    versions.push(FALLBACK_VERSIONS.find(v => v.channel === "ci")!);
-  }
-
-  versions.sort((a, b) => {
-    const order: Record<ReleaseChannel, number> = { release: 0, beta: 1, ci: 2 };
+function sortVersions(versions: ReleaseVersion[]): ReleaseVersion[] {
+  const order: Record<ReleaseChannel, number> = { release: 0, beta: 1, ci: 2 };
+  return [...versions].sort((a, b) => {
     if (a.channel !== b.channel) return order[a.channel] - order[b.channel];
     return compareTagsDesc(a.tag, b.tag);
   });
+}
 
-  if (!versions.length) throw new Error("No downloadable releases parsed from GitHub pages.");
-  return versions;
+/**
+ * Browser-safe loaders only talk to:
+ * - the site itself (launcher-releases.json from build)
+ * - raw.githubusercontent.com (GitHub raw, not REST API)
+ * Download buttons always use https://github.com/.../releases/download/...
+ */
+export async function fetchLauncherVersions(signal?: AbortSignal): Promise<ReleaseVersion[]> {
+  const local = await loadJsonCatalog(LOCAL_CATALOG, signal);
+  if (local?.length) return local;
+
+  const raw = await loadJsonCatalog(RAW_CATALOG, signal);
+  if (raw?.length) return raw;
+
+  // No third-party mirrors / CF HTML proxies — fall back to baked-in list.
+  return sortVersions(FALLBACK_VERSIONS);
 }
 
 export function versionsForChannel(
@@ -371,7 +221,6 @@ export function buildAssetFileName(input: {
 }): string {
   const configuration =
     input.channel === "release" ? "Release" : input.channel === "ci" ? "CI" : "Beta";
-  // CI channel currently only ships SelfContained.
   const runtime =
     input.channel === "ci" || input.includeRuntime ? "SelfContained" : "NoRuntime";
   const plugin = input.supportsPluginChoice
@@ -417,7 +266,6 @@ export function resolveDownloadUrls(
     };
   }
 
-  // CI: force SelfContained name if user picked NoRuntime.
   if (version.channel === "ci") {
     const ciName = assetFileName.replace("_NoRuntime", "_SelfContained");
     const ciHit = version.packageAssets.find(a => a.name === ciName);
