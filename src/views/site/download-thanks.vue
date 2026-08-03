@@ -23,6 +23,13 @@
         </div>
 
         <p class="hint">{{ t("site.download.thanks.hint") }}</p>
+        <div v-if="isAppImage" class="appimage-hint">
+          <span aria-hidden="true">i</span>
+          <div>
+            <p>{{ appImageHintText }}</p>
+            <code v-if="assetName">chmod +x {{ assetName }} && ./{{ assetName }}</code>
+          </div>
+        </div>
 
         <div class="footer-nav">
           <router-link to="/download">{{ t("site.download.thanks.back") }}</router-link>
@@ -75,6 +82,12 @@ const signatureUrl = computed(() => {
 });
 
 const assetName = computed(() => String(route.query.name ?? "").trim());
+const isAppImage = computed(
+  () => assetName.value.toLowerCase().endsWith(".appimage") || downloadUrl.value.toLowerCase().includes(".appimage")
+);
+const appImageHintText = computed(() =>
+  t("site.download.thanks.appImageChmod", { name: assetName.value || "PCL_N_….AppImage" })
+);
 
 const statusText = computed(() => {
   if (!downloadUrl.value) return t("site.download.thanks.invalid");
@@ -258,6 +271,41 @@ h1 {
   color: var(--market-muted);
   font-size: 12px;
   line-height: 1.65;
+}
+.appimage-hint {
+  margin: 18px auto 0;
+  max-width: 36rem;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  text-align: left;
+  border-radius: 12px;
+  background: var(--market-surface-soft, rgba(77, 91, 132, 0.07));
+  color: var(--market-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.appimage-hint span {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--market-accent, #568ee8);
+  background: var(--market-accent-soft, rgba(86, 142, 232, 0.12));
+  font-weight: 800;
+}
+.appimage-hint p {
+  margin: 0 0 8px;
+}
+.appimage-hint code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  word-break: break-all;
 }
 .footer-nav {
   margin-top: 32px;

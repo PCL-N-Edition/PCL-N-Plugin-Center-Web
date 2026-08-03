@@ -184,6 +184,8 @@ export default {
       yes: "是",
       no: "否",
       legacyNotice: "所选版本发布于新打包流程之前，因此安装包选项不可用；下载仍使用当时发布并签名的原始便携包。",
+      appImageHint:
+        "GitHub 下载不会保留可执行权限。下载后请执行：chmod +x 文件名.AppImage && ./文件名.AppImage",
       signature: "GPG 签名",
       downloadNow: "下载",
       verifyTitle: "所有正式包均提供 GPG 签名",
@@ -196,6 +198,8 @@ export default {
         subtitle: "浏览器应已开始下载安装包。若没有反应，请使用下方按钮手动开始。",
         starting: "正在唤起下载…",
         started: "下载已唤起。若未开始，请点击下方链接。",
+        appImageChmod:
+          "AppImage 下载后默认没有可执行权限，请在终端运行：chmod +x {name} && ./{name}",
         blocked: "自动下载可能被拦截，请点击下方链接继续。",
         invalid: "下载链接无效，请返回重新选择版本。",
         manualLink: "若未开始下载，点此手动下载",

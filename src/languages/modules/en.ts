@@ -184,6 +184,8 @@ export default {
       yes: "Yes",
       no: "No",
       legacyNotice: "This version predates the new packaging pipeline, so installer choices are unavailable. The download remains its original signed portable asset.",
+      appImageHint:
+        "Browsers and GitHub downloads strip the executable bit. After download run: chmod +x Your.AppImage && ./Your.AppImage",
       signature: "GPG signature",
       downloadNow: "Download",
       verifyTitle: "Every stable package includes a GPG signature",
@@ -196,6 +198,8 @@ export default {
         subtitle: "We asked the browser to start the download. If nothing happens, use the button below.",
         starting: "Starting download…",
         started: "Download triggered. If it did not start, use the link below.",
+        appImageChmod:
+          "AppImage files lose the executable bit after download. Run: chmod +x {name} && ./{name}",
         blocked: "Automatic download may be blocked. Use the link below to continue.",
         invalid: "Invalid download link. Go back and pick a version again.",
         manualLink: "If the download did not start, click here",

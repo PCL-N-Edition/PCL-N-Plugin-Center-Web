@@ -210,7 +210,11 @@
           <span aria-hidden="true">i</span>
           <p>{{ t("site.download.legacyNotice") }}</p>
         </div>
-        <div v-else class="asset-preview">
+        <div v-else-if="packageKind === 'appimage'" class="compatibility-note">
+          <span aria-hidden="true">i</span>
+          <p>{{ t("site.download.appImageHint") }}</p>
+        </div>
+        <div v-if="selectedVersion.packaging === 'v2'" class="asset-preview">
           <code>{{ assetFileName }}</code>
         </div>
       </div>
