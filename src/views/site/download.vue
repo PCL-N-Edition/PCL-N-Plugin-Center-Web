@@ -256,10 +256,13 @@ onMounted(async () => {
     const response = await fetch(catalogUrl, { cache: "no-cache" });
     if (!response.ok) return;
     const payload = await response.json() as CatalogPayload;
-    const remote = (payload.versions ?? []).filter(item => item.packaging === "v2" && item.id && item.tag && item.label);
+    const remote = (payload.versions ?? []).filter(item =>
+      (item.packaging === "v2" || item.packaging === "legacy") && item.id && item.tag && item.label);
     if (remote.length) {
-      const known = new Set(remote.map(item => item.id));
-      versions.value = [...remote, ...fallbackVersions.filter(item => !known.has(item.id))];
+      // The catalog is authoritative once the release workflow has created it.
+      // It applies the two-week rollback window, so expired fallback entries
+      // must not be appended indefinitely.
+      versions.value = remote;
       selectedVersionId.value = versions.value[0].id;
     }
   } catch {
