@@ -13,7 +13,7 @@
     "build": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build",
     "build:test": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode test",
     "build:prod": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode production && node scripts/prepare-github-pages.mjs",
-    "build:sites": "pnpm build:prod && node scripts/prepare-sites-build.mjs",
+    "build:sites": "pnpm build:prod && node scripts/prepare-sites-build.mjs && node scripts/prepare-github-pages.mjs",
     "type:check": "vue-tsc --noEmit --skipLibCheck",
     "check": "pnpm type:check && pnpm build:prod",
     "preview": "npm run build:dev && vite preview",

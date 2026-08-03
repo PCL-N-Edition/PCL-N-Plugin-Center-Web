@@ -1,15 +1,44 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, access } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const appShell = resolve("dist", "index.html");
-
-// GitHub Pages has no rewrite rules. Give crawlable public routes a real
-// index.html so they return HTTP 200, then keep 404.html as the fallback for
-// OAuth callbacks and other client-side routes.
-for (const route of ["download", "download/thanks", "market", "login"]) {
-  const directory = resolve("dist", route);
-  await mkdir(directory, { recursive: true });
-  await copyFile(appShell, resolve(directory, "index.html"));
+/**
+ * GitHub Pages has no SPA rewrite. Materialize history-mode routes as
+ * directory/index.html and set 404.html to the app shell so deep links work.
+ *
+ * Works for both flat `dist/` (pages.yml) and `dist/client/` (build:sites).
+ */
+const roots = [];
+for (const candidate of [resolve("dist", "client"), resolve("dist")]) {
+  try {
+    await access(resolve(candidate, "index.html"));
+    roots.push(candidate);
+  } catch {
+    // skip missing root
+  }
 }
 
-await copyFile(appShell, resolve("dist", "404.html"));
+if (!roots.length) {
+  throw new Error("prepare-github-pages: no dist/index.html or dist/client/index.html found");
+}
+
+const publicRoutes = [
+  "login",
+  "download",
+  "download/thanks",
+  "market",
+  "account",
+  "legal/accept",
+  "desktop/authorize"
+];
+
+for (const root of roots) {
+  const appShell = resolve(root, "index.html");
+  for (const route of publicRoutes) {
+    const directory = resolve(root, route);
+    await mkdir(directory, { recursive: true });
+    await copyFile(appShell, resolve(directory, "index.html"));
+  }
+  // Custom 404 serves the SPA shell so unknown paths still boot the router.
+  await copyFile(appShell, resolve(root, "404.html"));
+  console.log(`SPA routes + 404.html prepared under ${root}`);
+}

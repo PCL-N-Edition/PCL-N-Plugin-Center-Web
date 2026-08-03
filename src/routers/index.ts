@@ -36,10 +36,13 @@ normalizeOAuthErrorRedirect();
 const mode = import.meta.env.VITE_ROUTER_MODE;
 const useHashRouter = mode === "hash";
 const PRIMARY_STORE_ORIGIN = "https://pcln.top";
+// Prefer same-origin login on the store host (reliable SPA files).
+// auth.pcln.top remains for OAuth callback / dedicated auth branding when already there.
 const AUTH_ORIGIN = "https://auth.pcln.top";
 
 const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
-const isPrimaryStoreHost = () => ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
+const isPrimaryStoreHost = () =>
+  ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
 
 /** Build absolute URL with history paths (never hash), for login / cross-host redirects. */
 const buildExternalRoute = (origin: string, route: string) => {
@@ -49,7 +52,12 @@ const buildExternalRoute = (origin: string, route: string) => {
   // Keep site base path if any, then append app route.
   const basePath = base.pathname.replace(/\/$/, "") || "";
   const appPath = routeUrl.pathname.startsWith("/") ? routeUrl.pathname : `/${routeUrl.pathname}`;
-  base.pathname = `${basePath}${appPath}`.replace(/\/{2,}/g, "/") || "/";
+  // Trailing slash helps GitHub Pages resolve directory/index.html.
+  let pathname = `${basePath}${appPath}`.replace(/\/{2,}/g, "/") || "/";
+  if (!pathname.endsWith("/") && !pathname.split("/").pop()?.includes(".")) {
+    pathname = `${pathname}/`;
+  }
+  base.pathname = pathname;
   base.search = routeUrl.search;
   base.hash = "";
   return base;
@@ -60,8 +68,11 @@ const replaceExternalRoute = (origin: string, route: string) => {
 };
 
 const replaceWithAuth = (redirect: string) => {
+  // Use primary store /login/ (history + SPA shell). auth.pcln.top historically
+  // only had root index.html; /login 404'd on GitHub Pages without a materialised route.
+  const loginOrigin = isAuthHost() ? AUTH_ORIGIN : PRIMARY_STORE_ORIGIN;
   const target = buildExternalRoute(
-    AUTH_ORIGIN,
+    loginOrigin,
     `/login?redirect=${encodeURIComponent(redirect)}`
   );
   window.location.replace(target.toString());

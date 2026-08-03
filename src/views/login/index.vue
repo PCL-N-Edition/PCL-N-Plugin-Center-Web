@@ -163,11 +163,12 @@ const signIn = async (provider: "github" | "azure") => {
     ? route.query.redirect
     : "/";
 
+  // OAuth always starts/returns on the primary store with history paths (…/login/?…, not #/login).
+  // auth.pcln.top GH Pages may lack /login/index.html and would 404 on deep links.
   if (isAuthHost()) {
-    // History path on primary store — no #/login prefix.
     const oauthStart = new URL(import.meta.env.BASE_URL || "/", PRIMARY_STORE_ORIGIN);
     const basePath = oauthStart.pathname.replace(/\/$/, "");
-    oauthStart.pathname = `${basePath}/login`.replace(/\/{2,}/g, "/");
+    oauthStart.pathname = `${basePath}/login/`.replace(/\/{2,}/g, "/");
     oauthStart.search = `?provider=${provider}&redirect=${encodeURIComponent(target)}`;
     oauthStart.hash = "";
     window.location.assign(oauthStart.toString());
@@ -178,9 +179,13 @@ const signIn = async (provider: "github" | "azure") => {
   const redirectTo = new URL(import.meta.env.BASE_URL || "/", callbackOrigin);
   const basePath = redirectTo.pathname.replace(/\/$/, "");
   const appPath = target.startsWith("/") ? target : `/${target}`;
-  // OAuth return URL uses clean history path (e.g. https://pcln.top/market), not #/market.
+  // OAuth return URL uses clean history path (e.g. https://pcln.top/market/), not #/market.
   const pathAndQuery = appPath.split("?");
-  redirectTo.pathname = `${basePath}${pathAndQuery[0]}`.replace(/\/{2,}/g, "/") || "/";
+  let pathname = `${basePath}${pathAndQuery[0]}`.replace(/\/{2,}/g, "/") || "/";
+  if (!pathname.endsWith("/") && !pathname.split("/").pop()?.includes(".")) {
+    pathname = `${pathname}/`;
+  }
+  redirectTo.pathname = pathname;
   redirectTo.search = pathAndQuery[1] ? `?${pathAndQuery[1]}` : "";
   redirectTo.hash = "";
   const { error } = await supabase.auth.signInWithOAuth({
