@@ -16,6 +16,12 @@ export const layoutRouter: RouteRecordRaw[] = [
     meta: { title: "下载 PCL N" }
   },
   {
+    path: "/download/thanks",
+    name: "publicDownloadThanks",
+    component: () => import("@/views/site/download-thanks.vue"),
+    meta: { title: "开始下载" }
+  },
+  {
     path: "/market",
     name: "publicMarket",
     component: () => import("@/views/market/index.vue"),

@@ -49,15 +49,24 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
       port: 5730, // 端口号
       hmr: true, // 热更新
       open: false, // 保持无界面运行，不打断桌面工作
-      proxy: env.VITE_WEB_BASE_API.startsWith("/") ? {
-        // 代理跨域
-        [env.VITE_WEB_BASE_API]: {
-          // 配置哪个环境下的
-          target: env.VITE_SERVER,
-          // 允许跨域
-          changeOrigin: true
-        }
-      } : undefined
+      proxy: {
+        // Optional same-origin proxy for GitHub *web* pages (HTML/Atom), not REST API.
+        // Set VITE_GITHUB_HTML_PROXY=/github-html in .env.development to use it.
+        "/github-html": {
+          target: "https://github.com",
+          changeOrigin: true,
+          rewrite: (p: string) => p.replace(/^\/github-html/, "")
+        },
+        ...(env.VITE_WEB_BASE_API?.startsWith("/")
+          ? {
+              // 代理跨域 API
+              [env.VITE_WEB_BASE_API]: {
+                target: env.VITE_SERVER,
+                changeOrigin: true
+              }
+            }
+          : {})
+      }
     },
     esbuild: {
       // 在生产环境全部去除console 和 debugger
