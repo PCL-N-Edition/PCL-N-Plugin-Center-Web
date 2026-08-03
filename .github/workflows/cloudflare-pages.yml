@@ -101,9 +101,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          PROJECT=pcl-n-web
           npx --yes wrangler@4 whoami || true
+          # Create the Pages project on first deploy (wrangler does not always auto-create).
+          if ! npx --yes wrangler@4 pages project list 2>/dev/null | grep -F "$PROJECT" >/dev/null; then
+            echo "Creating Pages project: $PROJECT"
+            npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=master
+          fi
           npx --yes wrangler@4 pages deploy dist \
-            --project-name=pcl-n-web \
+            --project-name="$PROJECT" \
             --branch=master \
             --commit-dirty=true
           echo "deployment-url=https://pcln.top" >> "$GITHUB_OUTPUT"
