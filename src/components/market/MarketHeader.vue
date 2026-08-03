@@ -36,7 +36,10 @@ const route = useRoute();
 const userStore = useUserStore();
 const globalStore = useGlobalStore();
 const { t, locale } = useI18n();
-const authHref = computed(() => `https://auth.pcln.top/login?redirect=${encodeURIComponent(route.fullPath)}`);
+// History path on auth host — never #/login
+const authHref = computed(
+  () => `https://auth.pcln.top/login?redirect=${encodeURIComponent(route.fullPath || "/")}`
+);
 type ThemeMode = "system" | "light" | "dark";
 const themeMode = ref<ThemeMode>((localStorage.getItem("pcln-market-theme") as ThemeMode) || "system");
 const media = window.matchMedia("(prefers-color-scheme: dark)");

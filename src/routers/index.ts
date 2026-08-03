@@ -4,12 +4,12 @@ import nprogress from "@/utils/nprogress";
 import { RouteLocationNormalized } from "vue-router";
 import useUserStore from "@/stores/modules/user.ts";
 import useAuthStore from "@/stores/modules/auth.ts";
-import { LOGIN_URL, ROUTER_WHITE_LIST } from "@/config/index.ts";
+import { LOGIN_URL, isPublicRoutePath } from "@/config/index.ts";
 import { hasAcceptedNCloudLegal } from "@/utils/legal";
 import { ElMessageBox } from 'element-plus';
 import { useDebounceFn } from '@vueuse/core';
 import { initDynamicRouter, isDynamicRoutesMissing } from "@/routers/modules/dynamicRouter.ts";
-import { getMenuLanguage, isPathMatch } from "@/utils/index.ts";
+import { getMenuLanguage } from "@/utils/index.ts";
 import { completeOAuthCallback } from "@/lib/supabase";
 
 const normalizeOAuthErrorRedirect = () => {
@@ -23,31 +23,36 @@ const normalizeOAuthErrorRedirect = () => {
     "pcln-oauth-error",
     description ? decodeURIComponent(description) : error
   );
-  const target = sessionStorage.getItem("pcln-pending-link-provider") ? "/account?identityLinkError=1" : "/login?oauthError=1";
-  window.history.replaceState(window.history.state, document.title, `${currentUrl.pathname}#${target}`);
+  const target = sessionStorage.getItem("pcln-pending-link-provider")
+    ? "/account?identityLinkError=1"
+    : "/login?oauthError=1";
+  // History path only — no #/login prefix.
+  window.history.replaceState(window.history.state, document.title, target);
 };
 
 normalizeOAuthErrorRedirect();
 
-// .env配置文件读取
+// .env配置文件读取 — login/auth always use history paths (no #).
 const mode = import.meta.env.VITE_ROUTER_MODE;
+const useHashRouter = mode === "hash";
 const PRIMARY_STORE_ORIGIN = "https://pcln.top";
 const AUTH_ORIGIN = "https://auth.pcln.top";
 
 const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
 const isPrimaryStoreHost = () => ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
 
+/** Build absolute URL with history paths (never hash), for login / cross-host redirects. */
 const buildExternalRoute = (origin: string, route: string) => {
-  const target = new URL(import.meta.env.BASE_URL, origin);
+  const base = new URL(import.meta.env.BASE_URL || "/", origin);
   const normalizedRoute = route.startsWith("/") ? route : `/${route}`;
-  if (mode === "hash") {
-    target.hash = `#${normalizedRoute}`;
-  } else {
-    const routeUrl = new URL(normalizedRoute, target.origin);
-    target.pathname = routeUrl.pathname;
-    target.search = routeUrl.search;
-  }
-  return target;
+  const routeUrl = new URL(normalizedRoute, base.origin);
+  // Keep site base path if any, then append app route.
+  const basePath = base.pathname.replace(/\/$/, "") || "";
+  const appPath = routeUrl.pathname.startsWith("/") ? routeUrl.pathname : `/${routeUrl.pathname}`;
+  base.pathname = `${basePath}${appPath}`.replace(/\/{2,}/g, "/") || "/";
+  base.search = routeUrl.search;
+  base.hash = "";
+  return base;
 };
 
 const replaceExternalRoute = (origin: string, route: string) => {
@@ -64,21 +69,16 @@ const replaceWithAuth = (redirect: string) => {
 
 // Preserve links issued by previous hash-router deployments while exposing
 // clean, indexable URLs to search engines and new navigation.
-if (mode !== "hash" && window.location.hash.startsWith("#/")) {
+if (!useHashRouter && window.location.hash.startsWith("#/")) {
   const legacyRoute = window.location.hash.slice(1);
   window.history.replaceState(window.history.state, document.title, legacyRoute);
 }
 
-// 路由访问两种模式：带#号的哈希模式，正常路径的web模式。
-const routerMode: any = {
-  hash: () => createWebHashHistory(import.meta.env.BASE_URL),
-  history: () => createWebHistory(import.meta.env.BASE_URL)
-};
-
-// 创建路由器对象
+// 创建路由器对象 — prefer history (no #) unless explicitly configured for hash.
 const router = createRouter({
-  // 路由模式hash或者默认不带#
-  history: routerMode[mode](),
+  history: useHashRouter
+    ? createWebHashHistory(import.meta.env.BASE_URL)
+    : createWebHistory(import.meta.env.BASE_URL),
   routes: [...layoutRouter, ...staticRouter, ...errorRouter],
   strict: false,
   // 滚动行为
@@ -141,6 +141,23 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
     return true; // 允许访问登录页
   }
 
+  // 4、公开页（下载/市场/首页等）一律放行，不要求登录。
+  if (isPublicRoutePath(to.path)) {
+    // auth 主机上的公开页：除 /login 外引导回主站对应路径（下载等不在 auth 上提供）
+    if (isAuthHost() && to.path.toLocaleLowerCase() !== LOGIN_URL) {
+      if (userStore.token) {
+        replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
+        return false;
+      }
+      // 未登录访问 auth 上的非登录公开路径 → 主站
+      if (to.path !== "/" && to.path !== LOGIN_URL) {
+        replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
+        return false;
+      }
+    }
+    return true;
+  }
+
   // auth.pcln.top 只承载身份认证。OAuth 完成后把目标路由交回主站。
   if (isAuthHost()) {
     if (userStore.token) {
@@ -148,11 +165,6 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
       return false;
     }
     return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true };
-  }
-
-  // 4、判断访问页面是否在路由白名单地址[静态路由]中，如果存在直接放行。
-  if (ROUTER_WHITE_LIST.some((pattern: any) => isPathMatch(pattern, to.path))) {
-    return true; // 允许访问白名单路由
   }
 
   // 5、判断是否有 Token，没有重定向到 login 页面。

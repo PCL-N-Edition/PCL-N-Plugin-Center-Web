@@ -106,8 +106,11 @@ const load = async () => {
 };
 
 const linkProvider = async (provider: "github" | "azure") => {
-  const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin);
-  redirectTo.hash = "#/account?identityLinked=1";
+  const redirectTo = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+  const basePath = redirectTo.pathname.replace(/\/$/, "");
+  redirectTo.pathname = `${basePath}/account`.replace(/\/{2,}/g, "/") || "/account";
+  redirectTo.search = "?identityLinked=1";
+  redirectTo.hash = "";
   sessionStorage.setItem("pcln-pending-link-provider", provider);
   const { error } = await supabase.auth.linkIdentity({
     provider,

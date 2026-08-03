@@ -164,15 +164,25 @@ const signIn = async (provider: "github" | "azure") => {
     : "/";
 
   if (isAuthHost()) {
-    const oauthStart = new URL(import.meta.env.BASE_URL, PRIMARY_STORE_ORIGIN);
-    oauthStart.hash = `#/login?provider=${provider}&redirect=${encodeURIComponent(target)}`;
+    // History path on primary store — no #/login prefix.
+    const oauthStart = new URL(import.meta.env.BASE_URL || "/", PRIMARY_STORE_ORIGIN);
+    const basePath = oauthStart.pathname.replace(/\/$/, "");
+    oauthStart.pathname = `${basePath}/login`.replace(/\/{2,}/g, "/");
+    oauthStart.search = `?provider=${provider}&redirect=${encodeURIComponent(target)}`;
+    oauthStart.hash = "";
     window.location.assign(oauthStart.toString());
     return;
   }
 
   const callbackOrigin = isPrimaryStoreHost() ? PRIMARY_STORE_ORIGIN : window.location.origin;
-  const redirectTo = new URL(import.meta.env.BASE_URL, callbackOrigin);
-  redirectTo.hash = `#${target}`;
+  const redirectTo = new URL(import.meta.env.BASE_URL || "/", callbackOrigin);
+  const basePath = redirectTo.pathname.replace(/\/$/, "");
+  const appPath = target.startsWith("/") ? target : `/${target}`;
+  // OAuth return URL uses clean history path (e.g. https://pcln.top/market), not #/market.
+  const pathAndQuery = appPath.split("?");
+  redirectTo.pathname = `${basePath}${pathAndQuery[0]}`.replace(/\/{2,}/g, "/") || "/";
+  redirectTo.search = pathAndQuery[1] ? `?${pathAndQuery[1]}` : "";
+  redirectTo.hash = "";
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: redirectTo.toString(), scopes: provider === "azure" ? "profile email offline_access XboxLive.signin" : undefined }
