@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <!-- 与 Pinia global 持久化一致，首屏挂上主题色与 html.dark -->
   <script>
@@ -112,17 +112,38 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/pcln.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="发现经过审核与签名的 PCL N 插件；浏览、授权、安装和安全更新一站完成。" />
+  <meta name="description" content="PCL N 是面向 Windows、macOS 与 Linux 的现代 Minecraft 启动器，提供实例、资源、账户、插件与安全更新管理。" />
+  <meta name="keywords" content="PCL N,Minecraft启动器,Minecraft Launcher,模组管理,整合包,插件平台" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="author" content="PCL N contributors" />
+  <link rel="canonical" href="https://pcln.top/" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="PCL N Plugin Center" />
-  <meta property="og:title" content="PCL N 插件中心" />
-  <meta property="og:description" content="让启动器拥有更多可能。发现经过审核与签名的 PCL N 插件。" />
-  <meta property="og:image" content="https://pcln.top/og.png" />
+  <meta property="og:site_name" content="PCL N" />
+  <meta property="og:title" content="PCL N · 新一代 Minecraft 启动器" />
+  <meta property="og:description" content="跨平台管理 Minecraft 实例、资源、账户与插件。" />
+  <meta property="og:url" content="https://pcln.top/" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:image" content="https://pcln.top/og-home.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="PCL N 插件中心" />
-  <meta name="twitter:description" content="让启动器拥有更多可能。" />
-  <meta name="twitter:image" content="https://pcln.top/og.png" />
+  <meta name="twitter:title" content="PCL N · 新一代 Minecraft 启动器" />
+  <meta name="twitter:description" content="跨平台管理 Minecraft 实例、资源、账户与插件。" />
+  <meta name="twitter:image" content="https://pcln.top/og-home.png" />
   <title>%VITE_WEB_TITLE%</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "PCL N",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "description": "A modern cross-platform Minecraft launcher with instance, resource, account, plugin, and update management.",
+      "url": "https://pcln.top/",
+      "downloadUrl": "https://pcln.top/download",
+      "codeRepository": "https://github.com/PCL-N-Edition/PCL-N",
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" }
+    }
+  </script>
   <!-- 加载第一步开始 -->
   <style>
     .loading-box {
@@ -279,6 +300,14 @@
     </div>
     <!-- 第二步结束 -->
   </div>
+  <noscript>
+    <style>.loading-box { display: none !important; }</style>
+    <main>
+      <h1>PCL N Minecraft 启动器</h1>
+      <p>适用于 Windows、macOS 与 Linux 的现代 Minecraft 启动器。</p>
+      <p><a href="/download">下载 PCL N</a> · <a href="/market">浏览插件市场</a> · <a href="https://docs.pcln.top/">开发文档</a></p>
+    </main>
+  </noscript>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

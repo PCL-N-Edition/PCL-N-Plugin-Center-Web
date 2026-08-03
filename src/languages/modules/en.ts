@@ -4,7 +4,11 @@ export default {
   },
   market: {
     header: {
-      brand: "PCL N Plugin Center",
+      brand: "PCL N",
+      navigation: "Site navigation",
+      home: "Home",
+      plugins: "Plugins",
+      download: "Download",
       docs: "Documentation",
       dashboard: "Developer Console",
       signIn: "Sign in",
@@ -85,6 +89,76 @@ export default {
       theme: "Themes",
       developer: "Developer tools",
       gameplay: "Gameplay"
+    }
+  },
+  site: {
+    footer: {
+      tagline: "A new-generation cross-platform Minecraft launcher",
+      navigation: "Footer navigation"
+    },
+    home: {
+      pageTitle: "PCL N · A new-generation Minecraft launcher",
+      badge: "PCL N EDITION",
+      titleLead: "More than launching",
+      titleAccent: "Minecraft",
+      subtitle: "A modern Minecraft launcher for Windows, macOS, and Linux. Manage instances, content, and accounts, then extend it through a controlled plugin platform.",
+      download: "Download PCL N",
+      market: "Explore plugins",
+      previewTitle: "Ready for your next adventure",
+      previewText: "Instance, Java, and game files are ready",
+      previewReady: "Checks complete",
+      previewLaunch: "Play",
+      previewPlugin: "Plugin verified",
+      previewVerified: "Market signature is valid",
+      previewUpdate: "Up to date",
+      previewCurrent: "Safe updates enabled",
+      featuresTitle: "Core PCL N capabilities",
+      features: {
+        native: { title: "Native cross-platform", text: "A NativeAOT desktop host delivers a consistent experience across Windows, macOS, and Linux." },
+        instances: { title: "Complete instance control", text: "Manage game versions, loaders, mods, resource packs, worlds, and Java environments together." },
+        plugins: { title: "Controlled extensibility", text: "Clear permissions and verifiable signatures let plugins add power without giving up control." },
+        updates: { title: "Reliable updates", text: "Stable, beta, and CI channels stay separate, with verification, patches, and safe rollback." }
+      },
+      ecosystemTitle: "From launcher to ecosystem",
+      ecosystemText: "PCL N connects the desktop experience, plugin platform, and developer documentation—giving players capability and developers room to build.",
+      pluginTitle: "Plugin Market",
+      pluginText: "Discover reviewed and signed extensions",
+      docsTitle: "Developer documentation",
+      docsText: "From your first plugin to large plugin suites",
+      ctaTitle: "Your next launch starts here",
+      ctaText: "Choose the build for your device and PCL N will guide you through the rest.",
+      downloadNow: "Download now"
+    },
+    download: {
+      pageTitle: "Download PCL N",
+      title: "Download PCL N",
+      subtitle: "Choose the build matching your operating system and processor. Stable assets use permanent names that always point to the latest release.",
+      stableRelease: "View latest stable release",
+      previewReleases: "Beta and previous releases",
+      platformLabel: "Choose a build",
+      choosePlatform: "Your platform",
+      recommendationHint: "The SelfContained package is recommended. It includes the components plugins need and works immediately after extraction.",
+      recommended: "Best for this device",
+      download: "Download stable",
+      noRuntime: "NoRuntime",
+      signature: "GPG signature",
+      selfContainedTitle: "SelfContained · Recommended",
+      selfContainedText: "Includes the .NET runtime required by the plugin sidecar. The PCL N desktop executable itself remains NativeAOT.",
+      noRuntimeTitle: "NoRuntime · Smaller",
+      noRuntimeText: "Omits the plugin sidecar runtime. Choose it if a compatible .NET runtime is already installed or you do not use plugins yet.",
+      afterDownload: "After downloading",
+      installTitle: "Start in three steps",
+      steps: {
+        extractTitle: "Extract the complete archive",
+        extractText: "Do not run it inside the archive viewer. Extract every file to a writable folder.",
+        runTitle: "Start PCL N",
+        runText: "The first run prepares its data directory and guides you through terms, telemetry, and basic setup.",
+        finishTitle: "Add an account and game",
+        finishText: "Sign in, choose a Minecraft folder, then install or import an existing instance."
+      },
+      verifyTitle: "Every stable package includes a GPG signature",
+      verifyText: "To verify the source, download the adjacent .asc file and validate it with the project public key.",
+      publicKey: "View project public key"
     }
   },
   menu: {
@@ -418,6 +492,7 @@ export default {
     expandToolbar: "Expand toolbar",    
     personalCenter: "Personal Center",
     settings: "Settings",
+    changePassword: "Change password",
     logout: "Log out",
     dimensionList: {
       default: "default",

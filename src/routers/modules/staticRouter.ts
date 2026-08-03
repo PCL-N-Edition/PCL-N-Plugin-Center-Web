@@ -4,6 +4,18 @@ import Layout from "@/layouts/index.vue";
 
 export const layoutRouter: RouteRecordRaw[] = [
   {
+    path: "/",
+    name: "publicLanding",
+    component: () => import("@/views/site/index.vue"),
+    meta: { title: "PCL N" }
+  },
+  {
+    path: "/download",
+    name: "publicDownload",
+    component: () => import("@/views/site/download.vue"),
+    meta: { title: "下载 PCL N" }
+  },
+  {
     path: "/market",
     name: "publicMarket",
     component: () => import("@/views/market/index.vue"),
@@ -43,10 +55,10 @@ export const layoutRouter: RouteRecordRaw[] = [
 
 export const staticRouter: RouteRecordRaw[] = [
   {
-    path: "/",
+    path: "/app",
     name: "layout",
     component: Layout,
-    redirect: "/market",
+    redirect: HOME_URL,
     meta: {
       menuId: "-1",
       title: "PCL.N 插件中心",

@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "build:test": "vue-tsc && vite build --mode test",
-    "build:prod": "vue-tsc && vite build --mode production",
+    "build:prod": "vue-tsc && vite build --mode production && node scripts/prepare-github-pages.mjs",
     "build:sites": "pnpm build:prod && node scripts/prepare-sites-build.mjs",
     "type:check": "vue-tsc --noEmit --skipLibCheck",
     "check": "pnpm type:check && pnpm build:prod",

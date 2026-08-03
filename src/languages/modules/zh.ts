@@ -4,7 +4,11 @@ export default {
   },
   market: {
     header: {
-      brand: "PCL N 插件中心",
+      brand: "PCL N",
+      navigation: "网站导航",
+      home: "主页",
+      plugins: "插件市场",
+      download: "下载",
       docs: "开发文档",
       dashboard: "开发者工作台",
       signIn: "登录",
@@ -85,6 +89,76 @@ export default {
       theme: "主题美化",
       developer: "开发工具",
       gameplay: "游戏增强"
+    }
+  },
+  site: {
+    footer: {
+      tagline: "新一代跨平台 Minecraft 启动器",
+      navigation: "页脚导航"
+    },
+    home: {
+      pageTitle: "PCL N · 新一代 Minecraft 启动器",
+      badge: "PCL N EDITION",
+      titleLead: "不只是启动游戏",
+      titleAccent: "重新定义启动器",
+      subtitle: "面向 Windows、macOS 与 Linux 的现代 Minecraft 启动器。管理实例、资源与账户，并通过受控的插件平台自由扩展。",
+      download: "下载 PCL N",
+      market: "浏览插件市场",
+      previewTitle: "准备好开始冒险",
+      previewText: "实例、Java 与游戏文件均已就绪",
+      previewReady: "检查完成",
+      previewLaunch: "启动游戏",
+      previewPlugin: "插件已验证",
+      previewVerified: "市场签名有效",
+      previewUpdate: "保持最新",
+      previewCurrent: "安全更新已启用",
+      featuresTitle: "PCL N 核心能力",
+      features: {
+        native: { title: "原生跨平台", text: "NativeAOT 主程序覆盖 Windows、macOS 与 Linux，保持一致的使用体验。" },
+        instances: { title: "完整实例管理", text: "集中管理游戏版本、加载器、模组、资源包、世界与 Java 环境。" },
+        plugins: { title: "受控插件扩展", text: "权限清晰、签名可验证，让插件扩展能力而不牺牲可控性。" },
+        updates: { title: "可靠更新", text: "稳定、测试与 CI 通道各自独立，支持校验、增量更新与安全回退。" }
+      },
+      ecosystemTitle: "从启动器，到完整生态",
+      ecosystemText: "PCL N 将桌面体验、插件平台与开发文档连接起来，让玩家获得能力，让开发者拥有空间。",
+      pluginTitle: "插件市场",
+      pluginText: "发现经过审核与签名的扩展",
+      docsTitle: "开发者文档",
+      docsText: "从第一个插件到大型插件包",
+      ctaTitle: "下一次启动，从这里开始",
+      ctaText: "选择适合你设备的版本，PCL N 会引导你完成其余设置。",
+      downloadNow: "立即下载"
+    },
+    download: {
+      pageTitle: "下载 PCL N",
+      title: "下载 PCL N",
+      subtitle: "选择与你的系统和处理器匹配的版本。稳定版资源采用固定文件名，始终指向最新正式版本。",
+      stableRelease: "查看最新稳定版",
+      previewReleases: "测试版与历史版本",
+      platformLabel: "选择构建",
+      choosePlatform: "你的平台",
+      recommendationHint: "推荐下载 SelfContained 包；它包含插件运行所需的组件，解压即可使用。",
+      recommended: "适合此设备",
+      download: "下载稳定版",
+      noRuntime: "NoRuntime",
+      signature: "GPG 签名",
+      selfContainedTitle: "SelfContained · 推荐",
+      selfContainedText: "包含插件 Sidecar 所需的 .NET 运行时，插件功能开箱即用。PCL N 主程序本身仍为 NativeAOT。",
+      noRuntimeTitle: "NoRuntime · 更小",
+      noRuntimeText: "不携带插件 Sidecar 运行时；适合已安装兼容 .NET 运行时，或暂时不使用插件的用户。",
+      afterDownload: "下载后",
+      installTitle: "三步开始使用",
+      steps: {
+        extractTitle: "解压完整压缩包",
+        extractText: "不要直接在压缩软件中运行；将全部文件解压到可写目录。",
+        runTitle: "启动 PCL N",
+        runText: "首次运行会准备数据目录，并引导你完成协议、遥测与基础设置。",
+        finishTitle: "添加账户与游戏",
+        finishText: "登录账户、选择 Minecraft 文件夹，然后安装或导入现有实例。"
+      },
+      verifyTitle: "所有正式包均提供 GPG 签名",
+      verifyText: "需要核验来源时，请下载压缩包旁的 .asc 文件并使用项目公钥验证。",
+      publicKey: "查看项目公钥"
     }
   },
   menu: {
@@ -382,6 +456,7 @@ export default {
     displaySearch: "显示搜索",
     close: "关闭",
     genCode: "生成代码",
+    previewCode: "预览代码",
     sync: "同步",
     switch: "切换",
     publish: "发布",

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /desktop
+Disallow: /home
+Disallow: /login
+Disallow: /legal/accept
+Disallow: /system
+Disallow: /admin
+Disallow: /publisher
+
+Sitemap: https://pcln.top/sitemap.xml

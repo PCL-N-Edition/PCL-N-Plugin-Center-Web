@@ -97,6 +97,7 @@ import { computed, onMounted, ref, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import MarketHeader from "@/components/market/MarketHeader.vue";
 import { pluginCenterApi, type MarketCategory, type MarketPlugin } from "@/api/pluginCenter";
+import { applyPageSeo } from "@/utils/seo";
 
 const { t, te, locale } = useI18n();
 const search = ref("");
@@ -148,9 +149,12 @@ const selectCategory = async (id: string) => {
 };
 
 watch(apiLocale, () => void load());
-watch(apiLocale, () => void load());
 watchEffect(() => {
-  document.title = t("project.title");
+  applyPageSeo({
+    title: t("project.title"),
+    description: t("market.home.subtitle"),
+    path: "/market"
+  });
   document.documentElement.lang = locale.value === "zh" ? "zh-CN" : "en-US";
 });
 onMounted(async () => {

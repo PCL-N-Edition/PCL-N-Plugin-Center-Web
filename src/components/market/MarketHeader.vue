@@ -1,14 +1,17 @@
 <template>
   <header class="market-header">
-    <router-link to="/market" class="brand" aria-label="PCL N Plugin Center">
+    <router-link to="/" class="brand" aria-label="PCL N">
       <img class="brand-mark" src="/pcln.png" alt="" />
       <span class="brand-copy">
         <strong>{{ t("market.header.brand") }}</strong>
         <small>PLUGIN PLATFORM</small>
       </span>
     </router-link>
-    <nav aria-label="Market navigation">
-      <a href="https://docs.pcln.top/" target="_blank" rel="noreferrer">{{ t("market.header.docs") }}</a>
+    <nav :aria-label="t('market.header.navigation')">
+      <router-link to="/">{{ t("market.header.home") }}</router-link>
+      <router-link to="/market">{{ t("market.header.plugins") }}</router-link>
+      <router-link to="/download">{{ t("market.header.download") }}</router-link>
+      <a class="docs-link" href="https://docs.pcln.top/" target="_blank" rel="noreferrer">{{ t("market.header.docs") }}</a>
       <router-link v-if="userStore.token" to="/home">{{ t("market.header.dashboard") }}</router-link>
       <a v-else :href="authHref">{{ t("market.header.signIn") }}</a>
       <button class="theme-button" type="button" :aria-label="t('market.header.switchTheme')" @click="cycleTheme">
@@ -33,7 +36,7 @@ const route = useRoute();
 const userStore = useUserStore();
 const globalStore = useGlobalStore();
 const { t, locale } = useI18n();
-const authHref = computed(() => `https://auth.pcln.top/#/login?redirect=${encodeURIComponent(route.path)}`);
+const authHref = computed(() => `https://auth.pcln.top/login?redirect=${encodeURIComponent(route.fullPath)}`);
 type ThemeMode = "system" | "light" | "dark";
 const themeMode = ref<ThemeMode>((localStorage.getItem("pcln-market-theme") as ThemeMode) || "system");
 const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -88,12 +91,13 @@ nav a, .language-button, .theme-button {
   font: inherit; font-size: 13px; cursor: pointer; transition: color .18s ease, background .18s ease;
 }
 nav a:hover, .language-button:hover, .theme-button:hover { color: var(--market-text); background: var(--market-surface-soft); }
+nav a.router-link-exact-active { color: var(--market-accent); background: var(--market-accent-soft); font-weight: 700; }
 .language-button, .theme-button { border: 1px solid var(--market-border); color: var(--market-text); }
 .theme-button { width: 36px; padding: 0; justify-content: center; }
 
 @media (max-width: 720px) {
   .market-header { width: min(100% - 28px, 1180px); height: 66px; }
-  .brand-copy small, nav a:first-child { display: none; }
+  .brand-copy, .docs-link, nav > a:nth-of-type(2) { display: none; }
   nav { gap: 2px; }
   nav a, .language-button, .theme-button { padding: 0 9px; }
 }

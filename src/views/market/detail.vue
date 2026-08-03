@@ -91,6 +91,7 @@ import { ElMessage } from "element-plus";
 import MarketHeader from "@/components/market/MarketHeader.vue";
 import { pluginCenterApi, type MarketPlugin } from "@/api/pluginCenter";
 import useUserStore from "@/stores/modules/user";
+import { applyPageSeo } from "@/utils/seo";
 
 const { t, te, locale } = useI18n();
 const route = useRoute();
@@ -208,7 +209,12 @@ const loadPlugin = async () => {
 };
 watch(apiLocale, () => void loadPlugin());
 watchEffect(() => {
-  document.title = plugin.value ? `${plugin.value.name} · ${t("project.title")}` : t("project.title");
+  const title = plugin.value ? `${plugin.value.name} · ${t("project.title")}` : t("project.title");
+  applyPageSeo({
+    title,
+    description: plugin.value?.summary || t("market.detail.noDescription"),
+    path: `/market/plugins/${encodeURIComponent(String(route.params.pluginId ?? ""))}`
+  });
   document.documentElement.lang = locale.value === "zh" ? "zh-CN" : "en-US";
 });
 onMounted(loadPlugin);

@@ -37,17 +37,37 @@ const AUTH_ORIGIN = "https://auth.pcln.top";
 const isAuthHost = () => window.location.hostname.toLowerCase() === "auth.pcln.top";
 const isPrimaryStoreHost = () => ["pcln.top", "www.pcln.top"].includes(window.location.hostname.toLowerCase());
 
-const replaceExternalHashRoute = (origin: string, route: string) => {
+const buildExternalRoute = (origin: string, route: string) => {
   const target = new URL(import.meta.env.BASE_URL, origin);
-  target.hash = `#${route.startsWith("/") ? route : `/${route}`}`;
-  window.location.replace(target.toString());
+  const normalizedRoute = route.startsWith("/") ? route : `/${route}`;
+  if (mode === "hash") {
+    target.hash = `#${normalizedRoute}`;
+  } else {
+    const routeUrl = new URL(normalizedRoute, target.origin);
+    target.pathname = routeUrl.pathname;
+    target.search = routeUrl.search;
+  }
+  return target;
+};
+
+const replaceExternalRoute = (origin: string, route: string) => {
+  window.location.replace(buildExternalRoute(origin, route).toString());
 };
 
 const replaceWithAuth = (redirect: string) => {
-  const target = new URL(import.meta.env.BASE_URL, AUTH_ORIGIN);
-  target.hash = `#/login?redirect=${encodeURIComponent(redirect)}`;
+  const target = buildExternalRoute(
+    AUTH_ORIGIN,
+    `/login?redirect=${encodeURIComponent(redirect)}`
+  );
   window.location.replace(target.toString());
 };
+
+// Preserve links issued by previous hash-router deployments while exposing
+// clean, indexable URLs to search engines and new navigation.
+if (mode !== "hash" && window.location.hash.startsWith("#/")) {
+  const legacyRoute = window.location.hash.slice(1);
+  window.history.replaceState(window.history.state, document.title, legacyRoute);
+}
 
 // 路由访问两种模式：带#号的哈希模式，正常路径的web模式。
 const routerMode: any = {
@@ -99,7 +119,7 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
         ? to.query.redirect
         : from.fullPath && from.fullPath !== LOGIN_URL ? from.fullPath : "/market";
       if (isAuthHost()) {
-        replaceExternalHashRoute(PRIMARY_STORE_ORIGIN, requestedRedirect);
+        replaceExternalRoute(PRIMARY_STORE_ORIGIN, requestedRedirect);
         return false;
       }
       return requestedRedirect;
@@ -124,7 +144,7 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
   // auth.pcln.top 只承载身份认证。OAuth 完成后把目标路由交回主站。
   if (isAuthHost()) {
     if (userStore.token) {
-      replaceExternalHashRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
+      replaceExternalRoute(PRIMARY_STORE_ORIGIN, to.fullPath);
       return false;
     }
     return { path: LOGIN_URL, query: { redirect: to.fullPath }, replace: true };
