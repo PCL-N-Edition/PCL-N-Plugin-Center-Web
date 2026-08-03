@@ -486,9 +486,21 @@ export async function fetchLauncherVersionsFromGitHub(
  * Secondary: same-origin catalog generated at build with the same sources (offline / CORS).
  * Last: baked-in FALLBACK_VERSIONS.
  */
+/** Normalize packaging flags so build-time catalogs cannot leave installers disabled. */
+export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
+  return {
+    ...v,
+    packageAssets: v.packageAssets ?? [],
+    channel: v.channel || detectChannel(v.tag),
+    packaging: detectPackaging(v.tag),
+    supportsPluginChoice: supportsPluginChoice(v.tag)
+  };
+}
+
 export async function fetchLauncherVersions(signal?: AbortSignal): Promise<ReleaseVersion[]> {
   try {
-    return await fetchLauncherVersionsFromGitHub(signal);
+    const remote = await fetchLauncherVersionsFromGitHub(signal);
+    return remote.map(normalizeReleaseVersion);
   } catch (err) {
     console.warn("[download] GitHub Atom/latest discovery failed:", err);
   }
@@ -506,17 +518,7 @@ export async function fetchLauncherVersions(signal?: AbortSignal): Promise<Relea
     if (response.ok) {
       const payload = (await response.json()) as { versions?: ReleaseVersion[] };
       const list = (payload.versions ?? [])
-        .map(v => ({
-          ...v,
-          packageAssets: v.packageAssets ?? [],
-          channel: v.channel || detectChannel(v.tag),
-          // Recompute so older build-time catalogs pick up installer support.
-          packaging: detectPackaging(v.tag),
-          supportsPluginChoice:
-            typeof v.supportsPluginChoice === "boolean"
-              ? v.supportsPluginChoice
-              : supportsPluginChoice(v.tag)
-        }))
+        .map(v => normalizeReleaseVersion({ ...v, packageAssets: v.packageAssets ?? [] } as ReleaseVersion))
         .filter(v => v.tag);
       if (list.length) return sortVersions(list);
     }
@@ -524,7 +526,7 @@ export async function fetchLauncherVersions(signal?: AbortSignal): Promise<Relea
     console.warn("[download] Local launcher-releases.json unavailable:", err);
   }
 
-  return sortVersions(FALLBACK_VERSIONS);
+  return sortVersions(FALLBACK_VERSIONS.map(normalizeReleaseVersion));
 }
 
 export function versionsForChannel(

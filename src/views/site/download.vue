@@ -44,15 +44,24 @@
         <div class="package-summary">
           <article>
             <b>01</b>
-            <div><strong>Windows</strong><span>MSI · EXE Installer · Portable EXE</span></div>
+            <div>
+              <strong>Windows · 3 种</strong>
+              <span>MSI 安装包 · EXE 安装包 · 便携 EXE</span>
+            </div>
           </article>
           <article>
             <b>02</b>
-            <div><strong>macOS</strong><span>DMG</span></div>
+            <div>
+              <strong>macOS · 1 种</strong>
+              <span>DMG 安装包</span>
+            </div>
           </article>
           <article>
             <b>03</b>
-            <div><strong>Linux</strong><span>DEB · RPM · AppImage · TAR.GZ</span></div>
+            <div>
+              <strong>Linux · 4 种</strong>
+              <span>DEB · RPM · AppImage · 便携 TAR.GZ</span>
+            </div>
           </article>
         </div>
       </section>
@@ -184,29 +193,14 @@
             </el-radio-group>
           </div>
 
-          <div class="option-row">
+          <div class="option-row package-kind-row">
             <div>
-              <strong>{{ t("site.download.delivery") }}</strong>
-              <small>{{ deliveryHint }}</small>
+              <strong>{{ t("site.download.packageKind") }}</strong>
+              <small>{{ packageKindHint }}</small>
             </div>
-            <el-radio-group v-model="delivery" size="large">
-              <el-radio-button value="installer" :disabled="!supportsInstaller">
-                {{ t("site.download.installer") }}
-              </el-radio-button>
-              <el-radio-button value="portable" :disabled="!supportsPortable">
-                {{ t("site.download.portable") }}
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-
-          <div v-if="delivery === 'installer' && packageFormats.length > 1" class="option-row">
-            <div>
-              <strong>{{ t("site.download.packageFormat") }}</strong>
-              <small>{{ t("site.download.packageFormatHint") }}</small>
-            </div>
-            <el-radio-group v-model="packageFormat" size="large">
-              <el-radio-button v-for="format in packageFormats" :key="format" :value="format">
-                {{ formatLabel(format) }}
+            <el-radio-group v-model="packageKind" size="large" class="package-kind-group">
+              <el-radio-button v-for="kind in packageKinds" :key="kind.id" :value="kind.id">
+                {{ kind.label }}
               </el-radio-button>
             </el-radio-group>
           </div>
@@ -215,6 +209,9 @@
         <div v-if="selectedVersion.packaging !== 'v2'" class="compatibility-note">
           <span aria-hidden="true">i</span>
           <p>{{ t("site.download.legacyNotice") }}</p>
+        </div>
+        <div v-else class="asset-preview">
+          <code>{{ assetFileName }}</code>
         </div>
       </div>
 
@@ -252,7 +249,16 @@ import {
 } from "@/utils/launcherReleases";
 
 type PlatformId = "windows" | "macos" | "linux";
-type Delivery = "installer" | "portable";
+/** Concrete package SKU matching published asset names. */
+type PackageKindId =
+  | "msi"
+  | "exe-installer"
+  | "dmg"
+  | "deb"
+  | "rpm"
+  | "appimage"
+  | "portable"
+  | "legacy-archive";
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -302,8 +308,7 @@ const selectedVersionId = ref(FALLBACK_VERSIONS.find(v => v.channel === "beta")?
 const selectedArch = ref("x64");
 const includeRuntime = ref(true);
 const includePlugin = ref(true);
-const delivery = ref<Delivery>("portable");
-const packageFormat = ref("exe-installer");
+const packageKind = ref<PackageKindId>("msi");
 
 const userAgent = navigator.userAgent.toLowerCase();
 const isArm =
@@ -329,18 +334,32 @@ const selectedVersion = computed(
     versions.value[0]
 );
 
-const supportsInstaller = computed(() => selectedVersion.value.packaging === "v2");
-const supportsPortable = computed(
-  () => selectedVersion.value.packaging !== "v2" || selectedPlatformId.value !== "macos"
-);
-const packageFormats = computed(() => {
-  if (selectedPlatformId.value === "windows") return ["exe-installer", "msi"];
-  if (selectedPlatformId.value === "linux") return ["deb", "rpm", "appimage"];
-  return ["dmg"];
+/** Platform package menus: Win×3, macOS×1, Linux×4 (v2); legacy keeps a single archive. */
+const packageKinds = computed(() => {
+  if (selectedVersion.value.packaging !== "v2") {
+    return [{ id: "legacy-archive" as const, label: t("site.download.legacyArchive") }];
+  }
+  if (selectedPlatformId.value === "windows") {
+    return [
+      { id: "msi" as const, label: "MSI" },
+      { id: "exe-installer" as const, label: "EXE" },
+      { id: "portable" as const, label: t("site.download.portable") }
+    ];
+  }
+  if (selectedPlatformId.value === "macos") {
+    return [{ id: "dmg" as const, label: "DMG" }];
+  }
+  return [
+    { id: "deb" as const, label: "DEB" },
+    { id: "rpm" as const, label: "RPM" },
+    { id: "appimage" as const, label: "AppImage" },
+    { id: "portable" as const, label: t("site.download.portableTar") }
+  ];
 });
-const deliveryHint = computed(() =>
+
+const packageKindHint = computed(() =>
   selectedVersion.value.packaging === "v2"
-    ? t("site.download.deliveryHint")
+    ? t("site.download.packageKindHint")
     : t("site.download.legacyDeliveryHint")
 );
 
@@ -354,38 +373,49 @@ const runtimeId = computed(() => {
   return `${prefix}-${selectedArch.value}`;
 });
 
-const assetFileName = computed(() =>
-  buildAssetFileName({
+const assetFileName = computed(() => {
+  const kind = packageKind.value;
+  if (kind === "legacy-archive" || selectedVersion.value.packaging !== "v2") {
+    return buildAssetFileName({
+      channel: selectedVersion.value.channel,
+      runtimeId: runtimeId.value,
+      includeRuntime: selectedChannel.value === "ci" ? true : includeRuntime.value,
+      includePlugin: includePlugin.value,
+      supportsPluginChoice: selectedVersion.value.supportsPluginChoice,
+      packaging: "legacy",
+      platform: selectedPlatformId.value,
+      delivery: "portable",
+      packageFormat: "zip"
+    });
+  }
+  const delivery = kind === "portable" ? "portable" : "installer";
+  const packageFormat =
+    kind === "portable"
+      ? selectedPlatformId.value === "windows"
+        ? "exe"
+        : "tar.gz"
+      : kind === "exe-installer"
+        ? "exe-installer"
+        : kind;
+  return buildAssetFileName({
     channel: selectedVersion.value.channel,
     runtimeId: runtimeId.value,
     includeRuntime: selectedChannel.value === "ci" ? true : includeRuntime.value,
     includePlugin: includePlugin.value,
     supportsPluginChoice: selectedVersion.value.supportsPluginChoice,
-    packaging: selectedVersion.value.packaging,
+    packaging: "v2",
     platform: selectedPlatformId.value,
-    delivery: delivery.value,
-    packageFormat: packageFormat.value
-  })
-);
+    delivery,
+    packageFormat
+  });
+});
 
 const resolved = computed(() => resolveDownloadUrls(selectedVersion.value, assetFileName.value));
 const downloadUrl = computed(() => resolved.value.downloadUrl);
 const signatureUrl = computed(() => resolved.value.signatureUrl);
-const selectedAssetLabel = computed(() =>
-  delivery.value === "portable" ? t("site.download.portable") : formatLabel(packageFormat.value)
+const selectedAssetLabel = computed(
+  () => packageKinds.value.find(k => k.id === packageKind.value)?.label ?? packageKind.value
 );
-
-const formatLabel = (format: string) =>
-  (
-    {
-      "exe-installer": "EXE",
-      msi: "MSI",
-      dmg: "DMG",
-      deb: "DEB",
-      rpm: "RPM",
-      appimage: "AppImage"
-    } as Record<string, string>
-  )[format] ?? format.toUpperCase();
 
 const channelHasVersions = (channel: ReleaseChannel) =>
   versionsForChannel(versions.value, channel).length > 0;
@@ -403,6 +433,13 @@ const selectChannel = (channel: ReleaseChannel) => {
   if (channel === "ci") includeRuntime.value = true;
 };
 
+const syncPackageKind = () => {
+  const kinds = packageKinds.value;
+  if (!kinds.some(k => k.id === packageKind.value)) {
+    packageKind.value = kinds[0]?.id ?? "legacy-archive";
+  }
+};
+
 const openDownload = (platform: PlatformId) => {
   selectedPlatformId.value = platform;
   selectedArch.value = isArm
@@ -410,6 +447,7 @@ const openDownload = (platform: PlatformId) => {
     : platform === "macos"
       ? "arm64"
       : "x64";
+  syncPackageKind();
   dialogVisible.value = true;
 };
 
@@ -425,9 +463,8 @@ const goThanks = () => {
   });
 };
 
-watch([selectedVersionId, selectedPlatformId], () => {
-  delivery.value = supportsInstaller.value && !supportsPortable.value ? "installer" : "portable";
-  packageFormat.value = packageFormats.value[0];
+watch([selectedVersionId, selectedPlatformId, selectedChannel], () => {
+  syncPackageKind();
 });
 
 watch(selectedChannel, ch => {
@@ -480,7 +517,7 @@ watchEffect(() => {
 :global(.download-dialog.el-dialog){--market-surface-solid:#fff;--market-surface-soft:rgba(77,91,132,.07);--market-text:#192034;--market-muted:#677087;--market-border:rgba(45,56,91,.12);--market-accent:#568ee8;--market-accent-soft:rgba(86,142,232,.12);--el-bg-color:var(--market-surface-solid);--el-text-color-primary:var(--market-text);--el-text-color-regular:var(--market-muted);--el-border-color:var(--market-border);overflow:hidden;border:1px solid var(--market-border);border-radius:22px;background:var(--market-surface-solid);box-shadow:0 35px 100px rgba(15,24,45,.28)}:global(html.dark .download-dialog.el-dialog){--market-surface-solid:#1a1f29;--market-surface-soft:rgba(255,255,255,.055);--market-text:#f4f7fc;--market-muted:#a7b0c2;--market-border:rgba(218,229,255,.12);--market-accent:#74aef4;--market-accent-soft:rgba(116,174,244,.14);box-shadow:0 38px 110px rgba(0,0,0,.55)}:global(.download-dialog .el-dialog__header){margin:0;padding:20px 22px;border-bottom:1px solid var(--market-border)}:global(.download-dialog .el-dialog__body){padding:22px}:global(.download-dialog .el-dialog__footer){padding:0 22px 22px}.dialog-heading,.dialog-heading>div{display:flex;align-items:center}.dialog-heading{justify-content:space-between}.dialog-heading>div{gap:12px}.dialog-platform-icon{width:39px;height:39px;display:grid;place-items:center;border-radius:11px;color:var(--market-accent);background:var(--market-accent-soft);font-size:18px}.dialog-heading div div{display:grid;gap:2px}.dialog-heading strong{color:var(--market-text);font-size:15px}.dialog-heading small{color:var(--market-muted);font-size:10px}.dialog-heading>button{width:34px;height:34px;border:1px solid var(--market-border);border-radius:10px;color:var(--market-muted);background:transparent;font-size:20px;cursor:pointer}.dialog-content{display:grid;gap:21px}.choice-section{display:grid;gap:11px}.choice-heading{display:flex;align-items:center;justify-content:space-between;gap:15px}.choice-heading strong{color:var(--market-text);font-size:12px}.choice-heading span{color:var(--market-muted);font-size:10px}
 .channel-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.channel-list button{min-width:0;padding:13px;text-align:left;border:1px solid var(--market-border);border-radius:12px;color:var(--market-text);background:var(--market-surface-soft);cursor:pointer}.channel-list button.selected{border-color:var(--market-accent);background:var(--market-accent-soft);box-shadow:inset 0 0 0 1px var(--market-accent)}.channel-list button.disabled,.channel-list button:disabled{opacity:.45;cursor:not-allowed}.channel-list b{display:block;font-size:12px}.channel-list small{display:block;margin-top:6px;color:var(--market-muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .version-select{width:100%}:global(.download-dialog .version-select .el-select__wrapper){min-height:44px;border-radius:12px}.version-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}.version-option i{color:var(--market-muted);font-size:11px;font-style:normal}
-.option-grid{padding:4px 0;border-top:1px solid var(--market-border)}.option-row{padding:13px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--market-border)}.option-row>div:first-child{display:grid;gap:4px}.option-row strong{color:var(--market-text);font-size:12px}.option-row small{color:var(--market-muted);font-size:9px}:global(.download-dialog .el-radio-button__inner){min-width:65px;border-color:var(--market-border);color:var(--market-muted);background:var(--market-surface-soft);box-shadow:none}:global(.download-dialog .el-radio-button__original-radio:checked + .el-radio-button__inner){border-color:var(--market-accent);color:#fff;background:var(--market-accent);box-shadow:-1px 0 0 0 var(--market-accent)}.compatibility-note{padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border-radius:12px;color:var(--market-muted);background:var(--market-surface-soft);font-size:10px;line-height:1.6}.compatibility-note span{width:19px;height:19px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;color:var(--market-accent);background:var(--market-accent-soft);font-weight:800}.compatibility-note p{margin:1px 0 0}.dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-footer>a:first-child{color:var(--market-muted);font-size:10px}.confirm-download{min-height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;color:#fff;background:var(--market-accent);font:inherit;font-size:12px;font-weight:760;cursor:pointer}
+.option-grid{padding:4px 0;border-top:1px solid var(--market-border)}.option-row{padding:13px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--market-border)}.option-row>div:first-child{display:grid;gap:4px}.option-row strong{color:var(--market-text);font-size:12px}.option-row small{color:var(--market-muted);font-size:9px}:global(.download-dialog .el-radio-button__inner){min-width:65px;border-color:var(--market-border);color:var(--market-muted);background:var(--market-surface-soft);box-shadow:none}:global(.download-dialog .el-radio-button__original-radio:checked + .el-radio-button__inner){border-color:var(--market-accent);color:#fff;background:var(--market-accent);box-shadow:-1px 0 0 0 var(--market-accent)}.compatibility-note{padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border-radius:12px;color:var(--market-muted);background:var(--market-surface-soft);font-size:10px;line-height:1.6}.compatibility-note span{width:19px;height:19px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;color:var(--market-accent);background:var(--market-accent-soft);font-weight:800}.compatibility-note p{margin:1px 0 0}.asset-preview{padding:10px 12px;border-radius:10px;background:var(--market-surface-soft);overflow:auto}.asset-preview code{color:var(--market-muted);font-size:10px;word-break:break-all}.package-kind-row{align-items:flex-start}.package-kind-group{flex-wrap:wrap;max-width:min(100%,420px);justify-content:flex-end}.dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-footer>a:first-child{color:var(--market-muted);font-size:10px}.confirm-download{min-height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;color:#fff;background:var(--market-accent);font:inherit;font-size:12px;font-weight:760;cursor:pointer}
 @media(max-width:780px){.platform-grid{grid-template-columns:1fr}.section-heading{align-items:start;flex-direction:column}.section-heading p{text-align:left}.install-notes{grid-template-columns:1fr;gap:24px}.channel-list{grid-template-columns:1fr}.option-row{align-items:flex-start;flex-direction:column}.option-row :deep(.el-radio-group){width:100%}.option-row :deep(.el-radio-button){flex:1}.option-row :deep(.el-radio-button__inner){width:100%}.dialog-footer{align-items:stretch;flex-direction:column-reverse}.confirm-download{width:100%}}
 @media(max-width:520px){.download-hero,.download-shell{width:min(100% - 28px,1120px)}.download-hero{padding:62px 0 38px}.download-hero h1{font-size:44px}.platform-grid article{padding:22px}.verify-card{align-items:flex-start;flex-wrap:wrap}.verify-card a{width:100%;margin-left:59px}}
 @media(prefers-reduced-motion:reduce){.platform-grid article,.download-button{transition:none}}

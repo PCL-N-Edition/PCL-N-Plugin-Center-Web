@@ -108,8 +108,35 @@ jobs:
             echo "Creating Pages project: $PROJECT"
             npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=master
           fi
+          # Deploy to the production branch so custom domains serve this build.
           npx --yes wrangler@4 pages deploy dist \
             --project-name="$PROJECT" \
             --branch=master \
             --commit-dirty=true
+
+          # Bind apex + auth domains to this project (idempotent).
+          # Without this, DNS may still proxy the old GitHub Pages origin.
+          for domain in pcln.top www.pcln.top auth.pcln.top; do
+            echo "Ensuring custom domain: $domain"
+            code=$(curl -sS -o /tmp/cf-domain.json -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}/domains" \
+              --data "{\"name\":\"${domain}\"}" || true)
+            echo "domain ${domain} HTTP ${code}"
+            head -c 400 /tmp/cf-domain.json || true
+            echo
+            # 200/201 created; 409 already exists — both OK
+            if [ "$code" != "200" ] && [ "$code" != "201" ] && [ "$code" != "409" ]; then
+              # Some accounts return 400 with success:false when already attached
+              if grep -qiE 'already|exists|taken' /tmp/cf-domain.json 2>/dev/null; then
+                echo "Domain ${domain} already attached."
+              else
+                echo "::warning::Could not attach ${domain} (HTTP ${code}). Add it manually in Pages → Custom domains."
+              fi
+            fi
+          done
+
           echo "deployment-url=https://pcln.top" >> "$GITHUB_OUTPUT"
+          echo "preview-url=https://${PROJECT}.pages.dev" >> "$GITHUB_OUTPUT"
