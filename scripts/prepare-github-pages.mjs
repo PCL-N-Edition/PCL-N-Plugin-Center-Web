@@ -1,6 +1,15 @@
-import { copyFile } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-// GitHub Pages has no rewrite rules. Serving the app shell as 404.html keeps
-// clean history routes such as /download addressable on first navigation.
-await copyFile(resolve("dist", "index.html"), resolve("dist", "404.html"));
+const appShell = resolve("dist", "index.html");
+
+// GitHub Pages has no rewrite rules. Give crawlable public routes a real
+// index.html so they return HTTP 200, then keep 404.html as the fallback for
+// OAuth callbacks and other client-side routes.
+for (const route of ["download", "market"]) {
+  const directory = resolve("dist", route);
+  await mkdir(directory, { recursive: true });
+  await copyFile(appShell, resolve(directory, "index.html"));
+}
+
+await copyFile(appShell, resolve("dist", "404.html"));
