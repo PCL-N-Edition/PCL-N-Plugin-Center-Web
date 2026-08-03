@@ -215,6 +215,21 @@ function supportsPluginChoice(tag) {
   return true;
 }
 
+/** Native installers + portable SKUs from v1.3.20 onward. */
+function detectPackaging(tag) {
+  if (isCiTag(tag)) return "legacy";
+  const core = normalizeVersion(tag).split("-")[0];
+  const m = core.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return "legacy";
+  const major = +m[1];
+  const minor = +m[2];
+  const patch = +m[3];
+  if (major > 1) return "v2";
+  if (major === 1 && minor > 3) return "v2";
+  if (major === 1 && minor === 3 && patch >= 20) return "v2";
+  return "legacy";
+}
+
 function parseAtomFeed(xml) {
   const entries = [];
   const entryRe = /<entry>([\s\S]*?)<\/entry>/gi;
@@ -318,8 +333,7 @@ async function main() {
       label: labelFor(e.tag, channel, e.title),
       tag: e.tag,
       channel,
-      // packaging/legacy is cosmetic; download URL uses BuildFullPackage convention
-      packaging: "legacy",
+      packaging: detectPackaging(e.tag),
       supportsPluginChoice: supportsPluginChoice(e.tag),
       publishedAt: e.updated,
       // Intentionally empty: LauncherUpdateService builds URLs by convention.

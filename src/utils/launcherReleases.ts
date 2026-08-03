@@ -47,6 +47,15 @@ const TAG_FROM_URL = /\/releases\/tag\/(?<tag>[^/?#\s"']+)/i; // no /g — singl
 /** Offline fallback when GitHub is unreachable (same channels as updater). */
 export const FALLBACK_VERSIONS: ReleaseVersion[] = [
   {
+    id: "v1.3.20-beta",
+    label: "1.3.20 Beta",
+    tag: "v1.3.20-beta",
+    channel: "beta",
+    packaging: "v2",
+    supportsPluginChoice: false,
+    packageAssets: []
+  },
+  {
     id: "v1.3.19-beta",
     label: "1.3.19 Beta",
     tag: "v1.3.19-beta",
@@ -166,6 +175,24 @@ export function supportsPluginChoice(tag: string): boolean {
   if (major === 1 && minor > 3) return false;
   if (major === 1 && minor === 3 && patch >= 6) return false;
   return true;
+}
+
+/**
+ * Native installers (_Installer.msi/exe/dmg/deb/rpm/AppImage + _Portable.*)
+ * ship from v1.3.20-beta onward. Older tags keep legacy zip/tar.gz only.
+ */
+export function detectPackaging(tag: string): Packaging {
+  if (isCiTag(tag)) return "legacy";
+  const core = normalizeVersion(tag).split("-")[0];
+  const m = core.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return "legacy";
+  const major = +m[1];
+  const minor = +m[2];
+  const patch = +m[3];
+  if (major > 1) return "v2";
+  if (major === 1 && minor > 3) return "v2";
+  if (major === 1 && minor === 3 && patch >= 20) return "v2";
+  return "legacy";
 }
 
 function labelFor(tag: string, channel: ReleaseChannel, title: string | null): string {
@@ -383,7 +410,7 @@ function entryToVersion(entry: AtomReleaseEntry): ReleaseVersion {
     label: labelFor(entry.tag, channel, entry.title),
     tag: entry.tag,
     channel,
-    packaging: "legacy",
+    packaging: detectPackaging(entry.tag),
     supportsPluginChoice: supportsPluginChoice(entry.tag),
     publishedAt: entry.updated ?? undefined,
     packageAssets: []
@@ -482,7 +509,13 @@ export async function fetchLauncherVersions(signal?: AbortSignal): Promise<Relea
         .map(v => ({
           ...v,
           packageAssets: v.packageAssets ?? [],
-          channel: v.channel || detectChannel(v.tag)
+          channel: v.channel || detectChannel(v.tag),
+          // Recompute so older build-time catalogs pick up installer support.
+          packaging: detectPackaging(v.tag),
+          supportsPluginChoice:
+            typeof v.supportsPluginChoice === "boolean"
+              ? v.supportsPluginChoice
+              : supportsPluginChoice(v.tag)
         }))
         .filter(v => v.tag);
       if (list.length) return sortVersions(list);
@@ -513,8 +546,11 @@ export function latestForChannel(
 }
 
 /**
- * LauncherUpdateService.BuildFullPackage:
- *   PCL_N_{Release|Beta|CI}_{runtimeId}_{SelfContained|NoRuntime}[_{WithPlugin|NoPlugin}].{zip|tar.gz}
+ * Release asset naming (matches scripts/package-release-*.{ps1,sh}):
+ *   PCL_N_{Release|Beta|CI}_{runtimeId}_{SelfContained|NoRuntime}[_{WithPlugin|NoPlugin}]
+ *     .zip | .tar.gz                              — updater / full archive
+ *     _Installer.{msi|exe|dmg|deb|rpm|AppImage} — system installers
+ *     _Portable.{exe|tar.gz}                    — portable payloads
  */
 export function buildAssetFileName(input: {
   channel: ReleaseChannel;
@@ -537,8 +573,11 @@ export function buildAssetFileName(input: {
   const base = `PCL_N_${configuration}_${input.runtimeId}_${variant}${plugin}`;
 
   if (input.packaging === "v2") {
-    if (input.delivery === "portable")
+    if (input.delivery === "portable") {
+      // macOS ships .app inside tar.gz (no separate Portable SKU).
+      if (input.platform === "macos") return `${base}.tar.gz`;
       return `${base}_Portable.${input.platform === "windows" ? "exe" : "tar.gz"}`;
+    }
     const suffix =
       input.packageFormat === "exe-installer"
         ? "exe"
