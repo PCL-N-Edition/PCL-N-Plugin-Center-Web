@@ -157,6 +157,8 @@ export default {
       channel: "发布通道",
       channelEmpty: "暂无可用版本",
       catalogLoading: "正在同步拉取最新版本…",
+      catalogLoadingShort: "同步中…",
+      catalogLoadingHint: "版本列表加载完成后即可选择并下载",
       catalogReady: "已获取 {count} 个版本（GitHub）",
       catalogReadyApi: "已同步 {count} 个版本（API）",
       catalogReadyStatic: "已获取 {count} 个版本（站点缓存）",

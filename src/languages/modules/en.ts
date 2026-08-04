@@ -157,6 +157,8 @@ export default {
       channel: "Channel",
       channelEmpty: "No builds available",
       catalogLoading: "Syncing latest versions…",
+      catalogLoadingShort: "Syncing…",
+      catalogLoadingHint: "You can pick options after the version list finishes loading",
       catalogReady: "Loaded {count} versions (GitHub)",
       catalogReadyApi: "Synced {count} versions (API)",
       catalogReadyStatic: "Loaded {count} versions (site snapshot)",

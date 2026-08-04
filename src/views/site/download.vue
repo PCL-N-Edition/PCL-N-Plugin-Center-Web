@@ -106,7 +106,20 @@
       </template>
 
       <div class="dialog-content">
-        <section class="choice-section">
+        <div
+          v-if="catalogLoading"
+          class="catalog-loading"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="catalog-spinner" aria-hidden="true" />
+          <div>
+            <strong>{{ t("site.download.catalogLoading") }}</strong>
+            <p>{{ catalogStatus || t("site.download.catalogLoadingHint") }}</p>
+          </div>
+        </div>
+
+        <section class="choice-section" :class="{ 'is-dimmed': catalogLoading }">
           <div class="choice-heading">
             <strong>{{ t("site.download.channel") }}</strong>
             <span>{{ catalogStatus }}</span>
@@ -118,7 +131,7 @@
               type="button"
               role="radio"
               :aria-checked="ch.id === selectedChannel"
-              :class="{ selected: ch.id === selectedChannel, disabled: catalogLoading || !channelHasVersions(ch.id) }"
+              :class="{ selected: ch.id === selectedChannel, disabled: !channelHasVersions(ch.id) }"
               :disabled="catalogLoading || !channelHasVersions(ch.id)"
               @click="selectChannel(ch.id)"
             >
@@ -128,7 +141,7 @@
           </div>
         </section>
 
-        <section class="choice-section">
+        <section class="choice-section" :class="{ 'is-dimmed': catalogLoading }">
           <div class="choice-heading">
             <strong>{{ t("site.download.version") }}</strong>
             <span>{{ t("site.download.versionHistoryHint") }}</span>
@@ -156,13 +169,13 @@
           </el-select>
         </section>
 
-        <section class="choice-section option-grid">
+        <section class="choice-section option-grid" :class="{ 'is-dimmed': catalogLoading }">
           <div class="option-row">
             <div>
               <strong>{{ t("site.download.architecture") }}</strong>
               <small>{{ t("site.download.architectureHint") }}</small>
             </div>
-            <el-radio-group v-model="selectedArch" size="large">
+            <el-radio-group v-model="selectedArch" size="large" :disabled="catalogLoading">
               <el-radio-button
                 v-for="arch in selectedPlatform.architectures"
                 :key="arch.id"
@@ -178,7 +191,11 @@
               <strong>{{ t("site.download.includeRuntime") }}</strong>
               <small>{{ t("site.download.includeRuntimeHint") }}</small>
             </div>
-            <el-radio-group v-model="includeRuntime" size="large" :disabled="selectedChannel === 'ci'">
+            <el-radio-group
+              v-model="includeRuntime"
+              size="large"
+              :disabled="catalogLoading || selectedChannel === 'ci'"
+            >
               <el-radio-button :value="true">{{ t("site.download.yes") }}</el-radio-button>
               <el-radio-button :value="false">{{ t("site.download.no") }}</el-radio-button>
             </el-radio-group>
@@ -189,7 +206,7 @@
               <strong>{{ t("site.download.includePlugin") }}</strong>
               <small>{{ t("site.download.includePluginHint") }}</small>
             </div>
-            <el-radio-group v-model="includePlugin" size="large">
+            <el-radio-group v-model="includePlugin" size="large" :disabled="catalogLoading">
               <el-radio-button :value="true">{{ t("site.download.yes") }}</el-radio-button>
               <el-radio-button :value="false">{{ t("site.download.no") }}</el-radio-button>
             </el-radio-group>
@@ -200,7 +217,12 @@
               <strong>{{ t("site.download.packageKind") }}</strong>
               <small>{{ packageKindHint }}</small>
             </div>
-            <el-radio-group v-model="packageKind" size="large" class="package-kind-group">
+            <el-radio-group
+              v-model="packageKind"
+              size="large"
+              class="package-kind-group"
+              :disabled="catalogLoading"
+            >
               <el-radio-button v-for="kind in packageKinds" :key="kind.id" :value="kind.id">
                 {{ kind.label }}
               </el-radio-button>
@@ -208,25 +230,42 @@
           </div>
         </section>
 
-        <div v-if="selectedVersion.packaging !== 'v2'" class="compatibility-note">
+        <div v-if="!catalogLoading && selectedVersion.packaging !== 'v2'" class="compatibility-note">
           <span aria-hidden="true">i</span>
           <p>{{ t("site.download.legacyNotice") }}</p>
         </div>
-        <div v-else-if="packageKind === 'appimage'" class="compatibility-note">
+        <div v-else-if="!catalogLoading && packageKind === 'appimage'" class="compatibility-note">
           <span aria-hidden="true">i</span>
           <p>{{ t("site.download.appImageHint") }}</p>
         </div>
-        <div v-if="selectedVersion.packaging === 'v2'" class="asset-preview">
+        <div v-if="!catalogLoading && selectedVersion.tag && selectedVersion.packaging === 'v2'" class="asset-preview">
           <code>{{ assetFileName }}</code>
         </div>
       </div>
 
       <template #footer>
         <div class="dialog-footer">
-          <a :href="signatureUrl" target="_blank" rel="noreferrer">{{ t("site.download.signature") }} ↗</a>
-          <button class="confirm-download" type="button" @click="goThanks">
-            {{ t("site.download.downloadNow") }} · {{ selectedAssetLabel }}
-            <span aria-hidden="true">↓</span>
+          <a
+            v-if="!catalogLoading && signatureUrl"
+            :href="signatureUrl"
+            target="_blank"
+            rel="noreferrer"
+          >{{ t("site.download.signature") }} ↗</a>
+          <span v-else class="footer-placeholder">{{ catalogLoading ? t("site.download.catalogLoading") : "" }}</span>
+          <button
+            class="confirm-download"
+            type="button"
+            :disabled="catalogLoading || !canConfirmDownload"
+            @click="goThanks"
+          >
+            <span v-if="catalogLoading" class="btn-spinner" aria-hidden="true" />
+            <template v-if="catalogLoading">
+              {{ t("site.download.catalogLoading") }}
+            </template>
+            <template v-else>
+              {{ t("site.download.downloadNow") }} · {{ selectedAssetLabel }}
+              <span aria-hidden="true">↓</span>
+            </template>
           </button>
         </div>
       </template>
@@ -335,16 +374,32 @@ const selectedPlatform = computed(
 
 const channelVersions = computed(() => versionsForChannel(versions.value, selectedChannel.value));
 
+/** Safe placeholder so the dialog can open while the sync pull is still in flight. */
+const PLACEHOLDER_VERSION: ReleaseVersion = {
+  id: "",
+  label: "…",
+  tag: "",
+  channel: "beta",
+  packaging: "v2",
+  supportsPluginChoice: false,
+  packageAssets: []
+};
+
 const selectedVersion = computed(
   () =>
     channelVersions.value.find(item => item.id === selectedVersionId.value) ??
     channelVersions.value[0] ??
-    versions.value[0]
+    versions.value[0] ??
+    PLACEHOLDER_VERSION
+);
+
+const canConfirmDownload = computed(
+  () => !catalogLoading.value && Boolean(selectedVersion.value.tag) && Boolean(downloadUrl.value)
 );
 
 /** Platform package menus: Win×3, macOS×1, Linux×4 (v2); legacy keeps a single archive. */
 const packageKinds = computed(() => {
-  if (selectedVersion.value.packaging !== "v2") {
+  if (!selectedVersion.value.tag || selectedVersion.value.packaging !== "v2") {
     return [{ id: "legacy-archive" as const, label: t("site.download.legacyArchive") }];
   }
   if (selectedPlatformId.value === "windows") {
@@ -365,11 +420,12 @@ const packageKinds = computed(() => {
   ];
 });
 
-const packageKindHint = computed(() =>
-  selectedVersion.value.packaging === "v2"
+const packageKindHint = computed(() => {
+  if (!selectedVersion.value.tag) return t("site.download.catalogLoadingHint");
+  return selectedVersion.value.packaging === "v2"
     ? t("site.download.packageKindHint")
-    : t("site.download.legacyDeliveryHint")
-);
+    : t("site.download.legacyDeliveryHint");
+});
 
 const runtimeId = computed(() => {
   const prefix =
@@ -382,6 +438,7 @@ const runtimeId = computed(() => {
 });
 
 const assetFileName = computed(() => {
+  if (!selectedVersion.value.tag) return "";
   const kind = packageKind.value;
   if (kind === "legacy-archive" || selectedVersion.value.packaging !== "v2") {
     return buildAssetFileName({
@@ -418,7 +475,12 @@ const assetFileName = computed(() => {
   });
 });
 
-const resolved = computed(() => resolveDownloadUrls(selectedVersion.value, assetFileName.value));
+const resolved = computed(() => {
+  if (!selectedVersion.value.tag || !assetFileName.value) {
+    return { downloadUrl: "", signatureUrl: "", assetName: "" };
+  }
+  return resolveDownloadUrls(selectedVersion.value, assetFileName.value);
+});
 const downloadUrl = computed(() => resolved.value.downloadUrl);
 const signatureUrl = computed(() => resolved.value.signatureUrl);
 const selectedAssetLabel = computed(
@@ -429,6 +491,7 @@ const channelHasVersions = (channel: ReleaseChannel) =>
   versionsForChannel(versions.value, channel).length > 0;
 
 const channelLatestLabel = (channel: ReleaseChannel) => {
+  if (catalogLoading.value) return t("site.download.catalogLoadingShort");
   const latest = latestForChannel(versions.value, channel);
   return latest?.label ?? t("site.download.channelEmpty");
 };
@@ -460,6 +523,7 @@ const openDownload = (platform: PlatformId) => {
 };
 
 const goThanks = () => {
+  if (!canConfirmDownload.value) return;
   dialogVisible.value = false;
   router.push({
     path: "/download/thanks",
@@ -546,7 +610,10 @@ watchEffect(() => {
 .download-hero{width:min(1040px,calc(100% - 40px));margin:0 auto;padding:90px 0 58px;text-align:center}.eyebrow,.section-label,.section-heading span{color:var(--market-accent);font-size:10px;font-weight:800;letter-spacing:.15em}.download-hero h1{margin:14px 0 13px;font-size:clamp(42px,6vw,70px);letter-spacing:-.055em}.download-hero p{max-width:650px;margin:0 auto;color:var(--market-muted);font-size:16px;line-height:1.75}.download-shell{width:min(1120px,calc(100% - 40px));margin:0 auto 90px}.section-heading{margin:24px 0 20px;display:flex;align-items:end;justify-content:space-between;gap:20px}.section-heading h2{margin:7px 0 0;font-size:27px}.section-heading p{max-width:360px;margin:0;color:var(--market-muted);font-size:12px;text-align:right}
 .platform-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.platform-grid article{position:relative;padding:27px;border:1px solid var(--market-border);border-radius:20px;background:var(--market-surface);box-shadow:0 16px 45px rgba(34,45,79,.06);transition:transform .2s ease,border-color .2s ease,background .2s ease}.platform-grid article:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--market-accent) 45%,transparent);background:var(--market-surface-solid)}.platform-grid article.recommended{border-color:color-mix(in srgb,var(--market-accent) 52%,transparent);box-shadow:0 19px 54px rgba(64,119,200,.13)}.platform-top{min-height:48px;display:flex;align-items:start;justify-content:space-between}.platform-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:14px;color:var(--market-accent);background:var(--market-accent-soft);font-size:21px;font-weight:800}.recommended-label{padding:6px 9px;border-radius:8px;color:var(--market-accent);background:var(--market-accent-soft);font-size:9px;font-weight:800}.platform-grid h3{margin:25px 0 5px;font-size:23px}.platform-grid p{min-height:42px;margin:0 0 22px;color:var(--market-muted);font-size:12px;line-height:1.65}.download-button{width:100%;min-height:45px;border:0;border-radius:12px;color:#fff;background:var(--market-accent);font:inherit;font-size:13px;font-weight:760;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}.download-button:hover{transform:translateY(-1px);box-shadow:0 12px 27px rgba(60,121,207,.24)}
 .install-notes{margin-top:75px;display:grid;grid-template-columns:.55fr 1.45fr;gap:54px;align-items:start}.install-notes h2{margin:9px 0 0;font-size:31px;letter-spacing:-.03em}.package-summary{display:grid;gap:10px}.package-summary article{padding:17px 19px;display:flex;align-items:center;gap:15px;border:1px solid var(--market-border);border-radius:15px;background:var(--market-surface)}.package-summary b{color:var(--market-accent);font-size:11px}.package-summary div{display:grid;gap:3px}.package-summary strong{font-size:13px}.package-summary span{color:var(--market-muted);font-size:11px}.verify-card{margin-top:64px;padding:22px;display:flex;align-items:center;gap:17px;border:1px solid var(--market-border);border-radius:18px;background:var(--market-surface)}.verify-card>span{width:42px;height:42px;display:grid;place-items:center;flex:0 0 auto;border-radius:12px;color:var(--market-accent);background:var(--market-accent-soft)}.verify-card h2{margin:0 0 5px;font-size:14px}.verify-card p{margin:0;color:var(--market-muted);font-size:11px}.verify-card a{margin-left:auto;white-space:nowrap;color:var(--market-accent);font-size:11px;font-weight:750}
-:global(.download-dialog.el-dialog){--market-surface-solid:#fff;--market-surface-soft:rgba(77,91,132,.07);--market-text:#192034;--market-muted:#677087;--market-border:rgba(45,56,91,.12);--market-accent:#568ee8;--market-accent-soft:rgba(86,142,232,.12);--el-bg-color:var(--market-surface-solid);--el-text-color-primary:var(--market-text);--el-text-color-regular:var(--market-muted);--el-border-color:var(--market-border);overflow:hidden;border:1px solid var(--market-border);border-radius:22px;background:var(--market-surface-solid);box-shadow:0 35px 100px rgba(15,24,45,.28)}:global(html.dark .download-dialog.el-dialog){--market-surface-solid:#1a1f29;--market-surface-soft:rgba(255,255,255,.055);--market-text:#f4f7fc;--market-muted:#a7b0c2;--market-border:rgba(218,229,255,.12);--market-accent:#74aef4;--market-accent-soft:rgba(116,174,244,.14);box-shadow:0 38px 110px rgba(0,0,0,.55)}:global(.download-dialog .el-dialog__header){margin:0;padding:20px 22px;border-bottom:1px solid var(--market-border)}:global(.download-dialog .el-dialog__body){padding:22px}:global(.download-dialog .el-dialog__footer){padding:0 22px 22px}.dialog-heading,.dialog-heading>div{display:flex;align-items:center}.dialog-heading{justify-content:space-between}.dialog-heading>div{gap:12px}.dialog-platform-icon{width:39px;height:39px;display:grid;place-items:center;border-radius:11px;color:var(--market-accent);background:var(--market-accent-soft);font-size:18px}.dialog-heading div div{display:grid;gap:2px}.dialog-heading strong{color:var(--market-text);font-size:15px}.dialog-heading small{color:var(--market-muted);font-size:10px}.dialog-heading>button{width:34px;height:34px;border:1px solid var(--market-border);border-radius:10px;color:var(--market-muted);background:transparent;font-size:20px;cursor:pointer}.dialog-content{display:grid;gap:21px}.choice-section{display:grid;gap:11px}.choice-heading{display:flex;align-items:center;justify-content:space-between;gap:15px}.choice-heading strong{color:var(--market-text);font-size:12px}.choice-heading span{color:var(--market-muted);font-size:10px}
+:global(.download-dialog.el-dialog){--market-surface-solid:#fff;--market-surface-soft:rgba(77,91,132,.07);--market-text:#192034;--market-muted:#677087;--market-border:rgba(45,56,91,.12);--market-accent:#568ee8;--market-accent-soft:rgba(86,142,232,.12);--el-bg-color:var(--market-surface-solid);--el-text-color-primary:var(--market-text);--el-text-color-regular:var(--market-muted);--el-border-color:var(--market-border);overflow:hidden;border:1px solid var(--market-border);border-radius:22px;background:var(--market-surface-solid);box-shadow:0 35px 100px rgba(15,24,45,.28)}:global(html.dark .download-dialog.el-dialog){--market-surface-solid:#1a1f29;--market-surface-soft:rgba(255,255,255,.055);--market-text:#f4f7fc;--market-muted:#a7b0c2;--market-border:rgba(218,229,255,.12);--market-accent:#74aef4;--market-accent-soft:rgba(116,174,244,.14);box-shadow:0 38px 110px rgba(0,0,0,.55)}:global(.download-dialog .el-dialog__header){margin:0;padding:20px 22px;border-bottom:1px solid var(--market-border)}:global(.download-dialog .el-dialog__body){padding:22px}:global(.download-dialog .el-dialog__footer){padding:0 22px 22px}.dialog-heading,.dialog-heading>div{display:flex;align-items:center}.dialog-heading{justify-content:space-between}.dialog-heading>div{gap:12px}.dialog-platform-icon{width:39px;height:39px;display:grid;place-items:center;border-radius:11px;color:var(--market-accent);background:var(--market-accent-soft);font-size:18px}.dialog-heading div div{display:grid;gap:2px}.dialog-heading strong{color:var(--market-text);font-size:15px}.dialog-heading small{color:var(--market-muted);font-size:10px}.dialog-heading>button{width:34px;height:34px;border:1px solid var(--market-border);border-radius:10px;color:var(--market-muted);background:transparent;font-size:20px;cursor:pointer}.dialog-content{display:grid;gap:21px}.choice-section{display:grid;gap:11px;transition:opacity .2s ease}.choice-section.is-dimmed{opacity:.55;pointer-events:none}.choice-heading{display:flex;align-items:center;justify-content:space-between;gap:15px}.choice-heading strong{color:var(--market-text);font-size:12px}.choice-heading span{color:var(--market-muted);font-size:10px}
+.catalog-loading{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--market-accent) 35%,var(--market-border));border-radius:14px;background:var(--market-accent-soft)}.catalog-loading strong{display:block;color:var(--market-text);font-size:13px}.catalog-loading p{margin:4px 0 0;color:var(--market-muted);font-size:11px;line-height:1.5}.catalog-spinner,.btn-spinner{width:22px;height:22px;flex:0 0 auto;border:2.5px solid color-mix(in srgb,var(--market-accent) 28%,transparent);border-top-color:var(--market-accent);border-radius:50%;animation:catalog-spin .7s linear infinite}.btn-spinner{width:14px;height:14px;border-width:2px}.footer-placeholder{color:var(--market-muted);font-size:10px}.confirm-download:disabled{opacity:.55;cursor:not-allowed;box-shadow:none;transform:none}
+@keyframes catalog-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.catalog-spinner,.btn-spinner{animation:none;border-top-color:var(--market-accent);opacity:.7}.choice-section{transition:none}}
 .channel-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.channel-list button{min-width:0;padding:13px;text-align:left;border:1px solid var(--market-border);border-radius:12px;color:var(--market-text);background:var(--market-surface-soft);cursor:pointer}.channel-list button.selected{border-color:var(--market-accent);background:var(--market-accent-soft);box-shadow:inset 0 0 0 1px var(--market-accent)}.channel-list button.disabled,.channel-list button:disabled{opacity:.45;cursor:not-allowed}.channel-list b{display:block;font-size:12px}.channel-list small{display:block;margin-top:6px;color:var(--market-muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .version-select{width:100%}:global(.download-dialog .version-select .el-select__wrapper){min-height:44px;border-radius:12px}.version-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}.version-option i{color:var(--market-muted);font-size:11px;font-style:normal}
 .option-grid{padding:4px 0;border-top:1px solid var(--market-border)}.option-row{padding:13px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--market-border)}.option-row>div:first-child{display:grid;gap:4px}.option-row strong{color:var(--market-text);font-size:12px}.option-row small{color:var(--market-muted);font-size:9px}:global(.download-dialog .el-radio-button__inner){min-width:65px;border-color:var(--market-border);color:var(--market-muted);background:var(--market-surface-soft);box-shadow:none}:global(.download-dialog .el-radio-button__original-radio:checked + .el-radio-button__inner){border-color:var(--market-accent);color:#fff;background:var(--market-accent);box-shadow:-1px 0 0 0 var(--market-accent)}.compatibility-note{padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border-radius:12px;color:var(--market-muted);background:var(--market-surface-soft);font-size:10px;line-height:1.6}.compatibility-note span{width:19px;height:19px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%;color:var(--market-accent);background:var(--market-accent-soft);font-weight:800}.compatibility-note p{margin:1px 0 0}.asset-preview{padding:10px 12px;border-radius:10px;background:var(--market-surface-soft);overflow:auto}.asset-preview code{color:var(--market-muted);font-size:10px;word-break:break-all}.package-kind-row{align-items:flex-start}.package-kind-group{flex-wrap:wrap;max-width:min(100%,420px);justify-content:flex-end}.dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-footer>a:first-child{color:var(--market-muted);font-size:10px}.confirm-download{min-height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;color:#fff;background:var(--market-accent);font:inherit;font-size:12px;font-weight:760;cursor:pointer}
