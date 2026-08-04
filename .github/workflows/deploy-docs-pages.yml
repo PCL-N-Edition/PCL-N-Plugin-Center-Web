@@ -1,0 +1,80 @@
+# One-shot / fallback: deploy PCLN-Docs to Cloudflare Pages using this repo's
+# cloudflare-pages environment secrets (same Account token as pcl-n-web).
+# Primary auto-deploy lives in PCL-N-Edition/PCLN-Docs → cloudflare-pages.yml.
+name: Deploy Docs (Cloudflare Pages)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-docs-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare-pages
+      url: https://docs.pcln.top
+    steps:
+      - name: Checkout docs
+        uses: actions/checkout@v6
+        with:
+          repository: PCL-N-Edition/PCLN-Docs
+          ref: main
+          path: docs-src
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: docs-src/pnpm-lock.yaml
+
+      - name: Install & build
+        working-directory: docs-src
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm docs:build
+          test -f .vitepress/dist/index.html
+
+      - name: Deploy to Cloudflare Pages (pcln-docs)
+        working-directory: docs-src
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          PROJECT=pcln-docs
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::error::Missing CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID on cloudflare-pages environment."
+            exit 1
+          fi
+          if ! npx --yes wrangler@4 pages project list 2>/dev/null | grep -F "$PROJECT" >/dev/null; then
+            echo "Creating Pages project: $PROJECT"
+            npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main
+          fi
+          npx --yes wrangler@4 pages deploy .vitepress/dist \
+            --project-name="$PROJECT" \
+            --branch=main \
+            --commit-dirty=true
+
+          for domain in docs.pcln.top; do
+            echo "Ensuring custom domain: $domain"
+            code=$(curl -sS -o /tmp/cf-domain.json -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${PROJECT}/domains" \
+              --data "{\"name\":\"${domain}\"}" || true)
+            echo "domain ${domain} HTTP ${code}"
+            head -c 500 /tmp/cf-domain.json || true
+            echo
+          done
+          echo "Done. Preview: https://${PROJECT}.pages.dev  Custom: https://docs.pcln.top"
