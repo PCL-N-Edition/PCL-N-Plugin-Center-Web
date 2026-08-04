@@ -1,5 +1,5 @@
-# Ensure docs.pcln.top DNS points at Cloudflare Pages (pcln-docs), not GitHub Pages.
-name: Fix docs.pcln.top DNS
+# Point docs.pcln.top at Cloudflare Pages (pcln-docs), not GitHub Pages.
+name: Fix Docs DNS
 
 on:
   workflow_dispatch:
@@ -12,72 +12,42 @@ jobs:
     runs-on: ubuntu-latest
     environment: cloudflare-pages
     steps:
-      - name: Point docs CNAME at pcln-docs.pages.dev
+      - name: Update DNS and verify
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          TOKEN="$CLOUDFLARE_API_TOKEN"
+          TOKEN="${CLOUDFLARE_API_TOKEN}"
+          AUTH="Authorization: Bearer ${TOKEN}"
 
-          zjson=$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
-            "https://api.cloudflare.com/client/v4/zones?name=pcln.top")
-          echo "$zjson" | head -c 800; echo
-          ZONE=$(echo "$zjson" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result'][0]['id'] if d.get('result') else '')")
-          if [ -z "$ZONE" ]; then
-            echo "::error::Could not find zone pcln.top"
-            exit 1
-          fi
-          echo "Zone: $ZONE"
-          export ZONE
+          zjson=$(curl -sS -H "$AUTH" "https://api.cloudflare.com/client/v4/zones?name=pcln.top")
+          echo "$zjson" | head -c 600; echo
+          ZONE=$(echo "$zjson" | python3 -c 'import sys,json; r=json.load(sys.stdin).get("result") or []; print(r[0]["id"] if r else "")')
+          test -n "$ZONE"
+          echo "Zone=$ZONE"
 
-          rjson=$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
-            "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=docs.pcln.top")
-          echo "Existing records:"
-          echo "$rjson" | python3 -m json.tool | head -n 80
+          rjson=$(curl -sS -H "$AUTH" "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=docs.pcln.top")
+          echo "Existing:"; echo "$rjson" | head -c 1200; echo
 
-          echo "$rjson" | ZONE="$ZONE" CLOUDFLARE_API_TOKEN="$TOKEN" python3 -c "
-import sys, json, os, urllib.request
-d = json.load(sys.stdin)
-token = os.environ['CLOUDFLARE_API_TOKEN']
-zone = os.environ['ZONE']
-for rec in d.get('result', []):
-    rid = rec['id']
-    print(f\"Deleting {rec['type']} {rec['name']} -> {rec.get('content')} ({rid})\")
-    req = urllib.request.Request(
-        f'https://api.cloudflare.com/client/v4/zones/{zone}/dns_records/{rid}',
-        method='DELETE',
-        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},
-    )
-    with urllib.request.urlopen(req) as resp:
-        print(resp.read().decode()[:400])
-"
+          # Delete all docs.pcln.top records (A/AAAA/CNAME)
+          echo "$rjson" | python3 -c 'import sys,json; [print(x["id"]) for x in (json.load(sys.stdin).get("result") or [])]' | while read -r rid; do
+            echo "DELETE $rid"
+            curl -sS -X DELETE -H "$AUTH" "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${rid}" | head -c 300
+            echo
+          done
 
-          create=$(curl -sS -X POST \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
+          create=$(curl -sS -X POST -H "$AUTH" -H "Content-Type: application/json" \
             "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
             --data '{"type":"CNAME","name":"docs","content":"pcln-docs.pages.dev","proxied":true,"ttl":1}')
-          echo "Create result:"
-          echo "$create" | python3 -m json.tool | head -n 50
+          echo "Create:"; echo "$create" | head -c 800; echo
 
-          # If create failed because record already exists / CF Pages owns it, try PATCH via list again
-          success=$(echo "$create" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success'))")
-          if [ "$success" != "True" ]; then
-            echo "::warning::CNAME create may have failed; listing records again"
-            curl -sS -H "Authorization: Bearer ${TOKEN}" \
-              "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=docs.pcln.top" | python3 -m json.tool | head -n 40
-          fi
-
-          proj=$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
+          domains=$(curl -sS -H "$AUTH" \
             "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/pcln-docs/domains")
-          echo "Pages domains:"
-          echo "$proj" | python3 -m json.tool | head -n 80
+          echo "Pages domains:"; echo "$domains" | head -c 1200; echo
 
-          sleep 5
-          code=$(curl -sS -o /tmp/docs.html -w "%{http_code}" --max-time 30 "https://pcln-docs.pages.dev/" || true)
-          echo "pcln-docs.pages.dev HTTP $code"
-          head -c 300 /tmp/docs.html || true; echo
-
-          echo "--- docs.pcln.top headers ---"
+          sleep 8
+          echo "--- pcln-docs.pages.dev ---"
+          curl -sSI --max-time 30 "https://pcln-docs.pages.dev/" | head -n 20 || true
+          echo "--- docs.pcln.top ---"
           curl -sSI --max-time 30 "https://docs.pcln.top/" | head -n 25 || true
