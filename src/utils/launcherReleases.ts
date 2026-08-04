@@ -1,12 +1,13 @@
 /**
- * Web version discovery — same model as
- * PCL.Application.Updates.LauncherUpdateService:
+ * Web version discovery:
  *
- *   1) Atom feed:  https://github.com/{owner}/{repo}/releases.atom
- *   2) Latest:     https://github.com/{owner}/{repo}/releases/latest  (Location / final URL → stable tag)
- *   3) Assets:     convention names only (BuildFullPackage), no REST / no asset listing
+ *   1) Plugin Center API  GET /v1/launcher/releases  (server-side GitHub refresh + cache)
+ *   2) Same-origin public/launcher-releases.json     (build-time snapshot)
+ *   3) Baked FALLBACK_VERSIONS
  *
- * No api.github.com, no third-party mirrors, no CF HTML reverse-proxy.
+ * Direct browser → github.com Atom is not used (no CORS). The edge function
+ * polls GitHub on the server so the download page stays current without a
+ * website redeploy.
  */
 
 export type ReleaseChannel = "release" | "beta" | "ci";
@@ -482,9 +483,11 @@ export async function fetchLauncherVersionsFromGitHub(
 }
 
 /**
- * Primary: GitHub Atom + /releases/latest (same as LauncherUpdateService).
- * Secondary: same-origin catalog generated at build with the same sources (offline / CORS).
+ * Primary: Plugin Center backend API (server refreshes GitHub, short cache).
+ * Secondary: same-origin catalog generated at build time.
  * Last: baked-in FALLBACK_VERSIONS.
+ * Direct browser GitHub Atom remains available as an emergency probe only
+ * (usually blocked by CORS in production).
  */
 /** Normalize packaging flags so build-time catalogs cannot leave installers disabled. */
 export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
@@ -497,12 +500,85 @@ export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
   };
 }
 
+export type LauncherVersionsSource = "api" | "static" | "github" | "fallback";
+
+export interface LauncherVersionsResult {
+  versions: ReleaseVersion[];
+  source: LauncherVersionsSource;
+  generatedAt?: string;
+}
+
+/**
+ * Fetch launcher versions from the Plugin Center edge API.
+ * Server-side discovery avoids browser CORS limits on github.com.
+ */
+export async function fetchLauncherVersionsFromApi(
+  signal?: AbortSignal
+): Promise<{ versions: ReleaseVersion[]; generatedAt?: string; source?: string }> {
+  const base = String(import.meta.env.VITE_WEB_BASE_API || "").replace(/\/+$/, "");
+  if (!base) throw new Error("VITE_WEB_BASE_API is not configured");
+
+  const headers: Record<string, string> = {
+    Accept: "application/json"
+  };
+  const publishable = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (publishable) {
+    headers.apikey = publishable;
+    headers.Authorization = `Bearer ${publishable}`;
+  }
+
+  const response = await fetch(`${base}/v1/launcher/releases`, {
+    cache: "no-cache",
+    signal,
+    headers
+  });
+  if (!response.ok) {
+    throw new Error(`launcher releases API HTTP ${response.status}`);
+  }
+  const payload = (await response.json()) as {
+    versions?: ReleaseVersion[];
+    generatedAt?: string;
+    source?: string;
+  };
+  const list = (payload.versions ?? [])
+    .map(v => normalizeReleaseVersion({ ...v, packageAssets: v.packageAssets ?? [] } as ReleaseVersion))
+    .filter(v => v.tag);
+  if (!list.length) throw new Error("launcher releases API returned no versions");
+  return {
+    versions: sortVersions(list),
+    generatedAt: payload.generatedAt,
+    source: payload.source
+  };
+}
+
 export async function fetchLauncherVersions(signal?: AbortSignal): Promise<ReleaseVersion[]> {
+  const result = await fetchLauncherVersionsWithSource(signal);
+  return result.versions;
+}
+
+/** Same as fetchLauncherVersions but reports which backend path won (for UI status). */
+export async function fetchLauncherVersionsWithSource(
+  signal?: AbortSignal
+): Promise<LauncherVersionsResult> {
+  try {
+    const remote = await fetchLauncherVersionsFromApi(signal);
+    return {
+      versions: remote.versions,
+      source: "api",
+      generatedAt: remote.generatedAt
+    };
+  } catch (err) {
+    console.warn("[download] Plugin Center launcher releases API failed:", err);
+  }
+
   try {
     const remote = await fetchLauncherVersionsFromGitHub(signal);
-    return remote.map(normalizeReleaseVersion);
+    return {
+      versions: remote.map(normalizeReleaseVersion),
+      source: "github"
+    };
   } catch (err) {
-    console.warn("[download] GitHub Atom/latest discovery failed:", err);
+    console.warn("[download] Direct GitHub Atom/latest discovery failed:", err);
   }
 
   try {
@@ -516,17 +592,29 @@ export async function fetchLauncherVersions(signal?: AbortSignal): Promise<Relea
       headers: { Accept: "application/json" }
     });
     if (response.ok) {
-      const payload = (await response.json()) as { versions?: ReleaseVersion[] };
+      const payload = (await response.json()) as {
+        versions?: ReleaseVersion[];
+        generatedAt?: string;
+      };
       const list = (payload.versions ?? [])
         .map(v => normalizeReleaseVersion({ ...v, packageAssets: v.packageAssets ?? [] } as ReleaseVersion))
         .filter(v => v.tag);
-      if (list.length) return sortVersions(list);
+      if (list.length) {
+        return {
+          versions: sortVersions(list),
+          source: "static",
+          generatedAt: payload.generatedAt
+        };
+      }
     }
   } catch (err) {
     console.warn("[download] Local launcher-releases.json unavailable:", err);
   }
 
-  return sortVersions(FALLBACK_VERSIONS.map(normalizeReleaseVersion));
+  return {
+    versions: sortVersions(FALLBACK_VERSIONS.map(normalizeReleaseVersion)),
+    source: "fallback"
+  };
 }
 
 export function versionsForChannel(

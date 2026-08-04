@@ -244,7 +244,7 @@ import { applyPageSeo } from "@/utils/seo";
 import {
   FALLBACK_VERSIONS,
   buildAssetFileName,
-  fetchLauncherVersions,
+  fetchLauncherVersionsWithSource,
   latestForChannel,
   resolveDownloadUrls,
   versionsForChannel,
@@ -481,7 +481,8 @@ onMounted(async () => {
   catalogStatus.value = t("site.download.catalogLoading");
   abort = new AbortController();
   try {
-    const remote = await fetchLauncherVersions(abort.signal);
+    const result = await fetchLauncherVersionsWithSource(abort.signal);
+    const remote = result.versions;
     if (remote.length) {
       versions.value = remote;
       // Prefer beta latest (active channel); else first available.
@@ -491,7 +492,15 @@ onMounted(async () => {
         selectedChannel.value = first.channel;
         selectedVersionId.value = first.id;
       }
-      catalogStatus.value = t("site.download.catalogReady", { count: remote.length });
+      if (result.source === "api") {
+        catalogStatus.value = t("site.download.catalogReadyApi", { count: remote.length });
+      } else if (result.source === "static") {
+        catalogStatus.value = t("site.download.catalogReadyStatic", { count: remote.length });
+      } else if (result.source === "github") {
+        catalogStatus.value = t("site.download.catalogReady", { count: remote.length });
+      } else {
+        catalogStatus.value = t("site.download.catalogFallback");
+      }
     } else {
       catalogStatus.value = t("site.download.catalogFallback");
     }
