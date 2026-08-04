@@ -59,7 +59,9 @@ export const layoutRouter: RouteRecordRaw[] = [
   },
   {
     // Session handoff landing on pcln.top after OAuth on auth.pcln.top.
+    // Alias with trailing slash so CF/directory hosts never miss the route.
     path: "/auth/callback",
+    alias: ["/auth/callback/"],
     name: "authCallback",
     component: () => import("@/views/auth/callback.vue"),
     meta: { title: "登录回跳" }

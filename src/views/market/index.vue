@@ -185,7 +185,8 @@ onMounted(async () => {
     radial-gradient(circle at 8% 23%, rgba(64, 162, 255, .1), transparent 24rem),
     var(--market-bg);
 }
-:global(html.dark) .market-page {
+/* Match download page: single global compound selector so dark vars apply under scoped CSS. */
+:global(html.dark .market-page) {
   --market-bg: #0f1118;
   --market-surface: rgba(24, 27, 38, .9);
   --market-surface-solid: #181b26;
@@ -195,6 +196,7 @@ onMounted(async () => {
   --market-muted: #a2a9bd;
   --market-accent: #7d8fff;
   --market-accent-soft: rgba(125, 143, 255, .13);
+  color-scheme: dark;
 }
 
 .hero {

@@ -31,6 +31,13 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import useGlobalStore from "@/stores/modules/global";
 import useUserStore from "@/stores/modules/user";
+import {
+  applyPublicTheme,
+  cyclePublicThemeMode,
+  readPublicThemeMode,
+  writePublicThemeMode,
+  type PublicThemeMode
+} from "@/utils/publicTheme";
 
 const route = useRoute();
 const userStore = useUserStore();
@@ -40,18 +47,17 @@ const { t, locale } = useI18n();
 const authHref = computed(
   () => `https://auth.pcln.top/login/?redirect=${encodeURIComponent(route.fullPath || "/")}`
 );
-type ThemeMode = "system" | "light" | "dark";
-const themeMode = ref<ThemeMode>((localStorage.getItem("pcln-market-theme") as ThemeMode) || "system");
+const themeMode = ref<PublicThemeMode>(readPublicThemeMode());
 const media = window.matchMedia("(prefers-color-scheme: dark)");
-const themeIcon = computed(() => themeMode.value === "system" ? "◐" : themeMode.value === "dark" ? "☾" : "☀");
+const themeIcon = computed(() =>
+  themeMode.value === "system" ? "◐" : themeMode.value === "dark" ? "☾" : "☀"
+);
 const applyMarketTheme = () => {
-  const dark = themeMode.value === "dark" || (themeMode.value === "system" && media.matches);
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  applyPublicTheme(themeMode.value);
 };
 const cycleTheme = () => {
-  themeMode.value = themeMode.value === "system" ? "light" : themeMode.value === "light" ? "dark" : "system";
-  localStorage.setItem("pcln-market-theme", themeMode.value);
+  themeMode.value = cyclePublicThemeMode(themeMode.value);
+  writePublicThemeMode(themeMode.value);
   applyMarketTheme();
 };
 onMounted(() => {

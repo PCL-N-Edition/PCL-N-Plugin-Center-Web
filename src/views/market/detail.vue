@@ -237,7 +237,7 @@ onMounted(loadPlugin);
     radial-gradient(circle at 92% 5%, rgba(111, 92, 255, .14), transparent 27rem),
     var(--market-bg);
 }
-:global(html.dark) .detail-page {
+:global(html.dark .detail-page) {
   --market-bg: #0f1118;
   --market-surface: rgba(24, 27, 38, .92);
   --market-surface-solid: #181b26;

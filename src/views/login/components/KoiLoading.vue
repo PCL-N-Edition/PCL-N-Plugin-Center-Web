@@ -52,8 +52,21 @@ const cancelLoading = () => {
   justify-content: center;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  /* Follow app theme: light uses soft veil, dark uses deeper panel */
+  background: color-mix(in srgb, var(--el-bg-color-page, #0f1118) 72%, #000 28%);
+  border: 1px solid var(--el-border-color-lighter, rgba(255, 255, 255, 0.12));
+  color-scheme: inherit;
+}
+
+:global(html.dark .loading-box) {
+  background: rgba(8, 10, 16, 0.88);
+  border-color: rgba(214, 220, 255, 0.1);
+}
+
+:global(html:not(.dark) .loading-box) {
+  background: rgba(245, 247, 251, 0.88);
+  border-color: rgba(45, 56, 91, 0.08);
+}
   // animation-name: circle-out-center;
   animation-duration: 2.5s;
   animation-timing-function: cubic-bezier(0.25, 1, 0.3, 1);

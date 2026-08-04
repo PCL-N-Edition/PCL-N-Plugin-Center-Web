@@ -112,14 +112,21 @@ export const handoffSessionToStore = async (redirectPath: string): Promise<void>
   window.location.replace(target.toString());
 };
 
+/** True when the current location is the session handoff landing route. */
+export const isAuthCallbackPath = (pathname = window.location.pathname): boolean => {
+  const normalized = (pathname.replace(/\/+$/, "") || "/").toLowerCase();
+  return normalized === "/auth/callback" || normalized.endsWith("/auth/callback");
+};
+
 /** Consume hash handoff on the store host; returns the intended app redirect. */
 export const consumeStoreAuthHandoff = async (): Promise<string | null> => {
   if (typeof window === "undefined") return null;
 
-  const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const isCallbackPath = path.endsWith("/auth/callback");
   const rawHash = window.location.hash.replace(/^#/, "");
-  if (!isCallbackPath || !rawHash.includes("access_token=")) {
+  // Accept tokens either on /auth/callback or (legacy) as a bare hash handoff.
+  const hasTokens = rawHash.includes("access_token=") && rawHash.includes("refresh_token=");
+  if (!hasTokens) return null;
+  if (!isAuthCallbackPath() && !rawHash.startsWith("access_token=")) {
     return null;
   }
 
@@ -148,8 +155,15 @@ export const consumeStoreAuthHandoff = async (): Promise<string | null> => {
       ? redirectParam
       : "/market";
 
-  // Strip tokens from the address bar immediately.
-  window.history.replaceState(window.history.state, document.title, redirect);
+  // Strip tokens immediately but keep the callback path until the router navigates.
+  // Replacing straight to `redirect` can race history-mode matching and surface a 404 shell.
+  current.hash = "";
+  current.searchParams.delete("redirect");
+  window.history.replaceState(
+    window.history.state,
+    document.title,
+    `${current.pathname}${current.search}`
+  );
   return redirect;
 };
 

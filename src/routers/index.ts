@@ -84,7 +84,13 @@ router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormali
     const handoffRedirect = await consumeStoreAuthHandoff();
     if (handoffRedirect) {
       await userStore.restoreSession(true);
-      return handoffRedirect;
+      // Navigate through a fresh guard pass so dynamic routes still initialize.
+      if (to.path === "/auth/callback" || to.path.endsWith("/auth/callback")) {
+        return { path: handoffRedirect, replace: true };
+      }
+      return handoffRedirect.startsWith("/")
+        ? { path: handoffRedirect, replace: true }
+        : handoffRedirect;
     }
 
     await completeOAuthCallback();

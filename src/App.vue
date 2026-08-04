@@ -9,6 +9,7 @@ import { onMounted, nextTick, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { getBrowserLang } from "@/utils/index.ts";
 import { useTheme } from "@/utils/theme.ts";
+import { applyPublicTheme } from "@/utils/publicTheme.ts";
 import en from "element-plus/es/locale/lang/en";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
 // import { autoRefresh } from "@/utils/autoUpdate.ts";
@@ -21,6 +22,9 @@ const { initThemeConfig } = useTheme();
 
 // 初始化语言
 const i18n = useI18n();
+
+// Public pages (market / login / callback) share pcln-market-theme; apply before first paint settles.
+applyPublicTheme();
 
 onMounted(() => {
   // 初始化主题配置
@@ -54,6 +58,8 @@ const handleI18nConfig = () => {
 /** 初始化主题配置 */
 const handleThemeConfig = () => {
   nextTick(() => {
+    // Re-apply public theme so pinia isDark matches market/login preference.
+    applyPublicTheme();
     initThemeConfig();
   });
 };

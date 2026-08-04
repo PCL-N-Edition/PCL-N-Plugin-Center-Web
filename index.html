@@ -66,9 +66,23 @@
         }
       }
 
+      function resolvePublicIsDark() {
+        try {
+          var mode = localStorage.getItem("pcln-market-theme");
+          if (mode === "dark") return true;
+          if (mode === "light") return false;
+          if (mode === "system" || !mode) {
+            return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          }
+        } catch (e) { /* ignore */ }
+        return null;
+      }
+
       function applyBootTheme(data, safeTheme, safeThemeRgb) {
         var html = document.documentElement;
-        var isDark = data && data.isDark === true;
+        // Prefer public market/login theme when set; fall back to admin pinia isDark.
+        var publicDark = resolvePublicIsDark();
+        var isDark = publicDark === null ? !!(data && data.isDark === true) : publicDark;
         html.style.setProperty("--loading-primary-color", safeTheme);
         html.style.setProperty("--loading-text-color", safeTheme);
         html.style.setProperty("--loading-primary-rgb", safeThemeRgb);
@@ -76,6 +90,9 @@
         if (isDark) {
           html.classList.add("dark");
           html.style.colorScheme = "dark";
+        } else {
+          html.classList.remove("dark");
+          html.style.colorScheme = "light";
         }
         var isHorizontal = data && data.layout === "horizontal";
         if (data && !isDark && (data.headerInverted === true || (isHorizontal && data.asideInverted === true))) {

@@ -7,7 +7,7 @@
         <p>{{ description }}</p>
       </div>
       <div class="heading-actions">
-        <el-button :loading="loading" @click="loadRows">刷新</el-button>
+        <el-button :loading="loading" @click="loadRows">{{ t("admin.refresh") }}</el-button>
         <el-tooltip v-if="primaryAction" content="写入操作将在受保护 API 接入后开放" placement="bottom">
           <el-button type="primary" disabled>{{ primaryAction }}</el-button>
         </el-tooltip>
@@ -40,7 +40,7 @@
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="当前权限范围内暂无数据" />
+          <el-empty :description="t('admin.tableEmpty')" />
         </template>
       </el-table>
     </el-card>
@@ -49,7 +49,10 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { supabase } from "@/lib/supabase";
+
+const { t, locale } = useI18n();
 
 interface TableColumn {
   prop: string;
@@ -95,25 +98,18 @@ const valueAt = (row: Record<string, any>, path: string) =>
   path.split(".").reduce((value, key) => value?.[key], row);
 
 const formatDate = (value: unknown) => value
-  ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(String(value)))
+  ? new Intl.DateTimeFormat(locale.value === "zh" ? "zh-CN" : "en-US", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(String(value)))
   : "—";
 
-const statusLabel = (value: unknown) => ({
-  draft: "草稿",
-  uploaded: "已上传",
-  scanning: "扫描中",
-  needs_review: "待审核",
-  pending: "待处理",
-  in_review: "审核中",
-  changes_requested: "需修改",
-  approved: "已通过",
-  rejected: "已拒绝",
-  published: "已发布",
-  suspended: "已停用",
-  archived: "已归档",
-  yanked: "已撤回",
-  active: "正常"
-})[String(value)] ?? String(value ?? "未知");
+const statusLabel = (value: unknown) => {
+  const key = `admin.status.${String(value)}`;
+  const translated = t(key);
+  if (translated !== key) return translated;
+  return String(value ?? "—");
+};
 
 const statusType = (value: unknown): "success" | "warning" | "danger" | "info" | "primary" => {
   if (["approved", "published", "active"].includes(String(value))) return "success";
@@ -128,7 +124,7 @@ onMounted(loadRows);
 <style scoped lang="scss">
 .center-page { padding: 4px; }
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
-.page-heading h1 { margin: 10px 0 8px; font-size: 26px; letter-spacing: -.02em; }
+.page-heading h1 { margin: 10px 0 8px; font-size: 26px; letter-spacing: -.02em; color: var(--el-text-color-primary); }
 .page-heading p { max-width: 720px; margin: 0; line-height: 1.7; color: var(--el-text-color-secondary); }
 .heading-actions { display: flex; gap: 10px; flex-shrink: 0; }
 .data-alert { margin-bottom: 16px; }

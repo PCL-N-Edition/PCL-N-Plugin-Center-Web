@@ -2,13 +2,13 @@
   <div class="center-page">
     <header class="page-heading">
       <div>
-        <el-tag size="small" effect="plain" round>Admin Workspace</el-tag>
-        <h1>启动器公告</h1>
-        <p>发布后由桌面端启动时拉取。支持多语言 Markdown、渠道/平台过滤与版本范围。</p>
+        <el-tag size="small" effect="plain" round>{{ t("admin.workspace") }}</el-tag>
+        <h1>{{ t("admin.announcements.title") }}</h1>
+        <p>{{ t("admin.announcements.description") }}</p>
       </div>
       <div class="heading-actions">
-        <el-button :loading="loading" @click="load">刷新</el-button>
-        <el-button type="primary" @click="openCreate">发布公告</el-button>
+        <el-button :loading="loading" @click="load">{{ t("admin.refresh") }}</el-button>
+        <el-button type="primary" @click="openCreate">{{ t("admin.announcements.publish") }}</el-button>
       </div>
     </header>
 
@@ -16,76 +16,81 @@
 
     <el-card shadow="never" class="table-card">
       <el-table v-loading="loading" :data="announcements" stripe>
-        <el-table-column label="ID" prop="id" min-width="160" />
-        <el-table-column label="标题" min-width="200">
+        <el-table-column :label="t('admin.announcements.id')" prop="id" min-width="160" />
+        <el-table-column :label="t('admin.announcements.headline')" min-width="200">
           <template #default="scope">{{ titleOf(scope.row) }}</template>
         </el-table-column>
-        <el-table-column label="级别" width="110">
+        <el-table-column :label="t('admin.announcements.severity')" width="110">
           <template #default="scope">
             <el-tag :type="severityType(scope.row.severity)" round>{{ severityLabel(scope.row.severity) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column :label="t('admin.announcements.status')" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.enabled ? 'success' : 'info'" round>
-              {{ scope.row.enabled ? "已启用" : "已停用" }}
+              {{ scope.row.enabled ? t("admin.announcements.enabled") : t("admin.announcements.disabled") }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="优先级" prop="priority" width="90" />
-        <el-table-column label="开始" min-width="170">
+        <el-table-column :label="t('admin.announcements.priority')" prop="priority" width="90" />
+        <el-table-column :label="t('admin.announcements.starts')" min-width="170">
           <template #default="scope">{{ formatDate(scope.row.starts_at) }}</template>
         </el-table-column>
-        <el-table-column label="结束" min-width="170">
-          <template #default="scope">{{ scope.row.ends_at ? formatDate(scope.row.ends_at) : "无限期" }}</template>
+        <el-table-column :label="t('admin.announcements.ends')" min-width="170">
+          <template #default="scope">{{ scope.row.ends_at ? formatDate(scope.row.ends_at) : t("admin.announcements.indefinite") }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column :label="t('admin.actions')" width="180" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="openEdit(scope.row)">编辑</el-button>
+            <el-button link type="primary" @click="openEdit(scope.row)">{{ t("admin.announcements.edit") }}</el-button>
             <el-button
               link
               :type="scope.row.enabled ? 'warning' : 'success'"
               :loading="actingId === scope.row.id"
               @click="toggleEnabled(scope.row)"
-            >{{ scope.row.enabled ? "停用" : "启用" }}</el-button>
-            <el-button link type="danger" :loading="actingId === scope.row.id" @click="remove(scope.row)">删除</el-button>
+            >{{ scope.row.enabled ? t("admin.announcements.disable") : t("admin.announcements.enable") }}</el-button>
+            <el-button link type="danger" :loading="actingId === scope.row.id" @click="remove(scope.row)">{{ t("admin.announcements.remove") }}</el-button>
           </template>
         </el-table-column>
-        <template #empty><el-empty description="暂无公告" /></template>
+        <template #empty><el-empty :description="t('admin.announcements.empty')" /></template>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑公告' : '发布公告'" width="720px" destroy-on-close>
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingId ? t('admin.announcements.editTitle') : t('admin.announcements.createTitle')"
+      width="720px"
+      destroy-on-close
+    >
       <el-form label-position="top">
-        <el-form-item label="公告 ID" required>
+        <el-form-item :label="t('admin.announcements.announcementId')" required>
           <el-input
             v-model="form.id"
             :disabled="Boolean(editingId)"
-            placeholder="例如 release-1-3-9 或 security-2026-07"
+            placeholder="release-1-3-9 / security-2026-07"
           />
         </el-form-item>
         <div class="form-grid">
-          <el-form-item label="级别" required>
+          <el-form-item :label="t('admin.announcements.severity')" required>
             <el-select v-model="form.severity" style="width: 100%">
-              <el-option label="普通 (info)" value="info" />
-              <el-option label="重要 (important)" value="important" />
-              <el-option label="安全 (security)" value="security" />
+              <el-option :label="t('admin.announcements.severityInfo')" value="info" />
+              <el-option :label="t('admin.announcements.severityImportant')" value="important" />
+              <el-option :label="t('admin.announcements.severitySecurity')" value="security" />
             </el-select>
           </el-form-item>
-          <el-form-item label="优先级">
+          <el-form-item :label="t('admin.announcements.priority')">
             <el-input-number v-model="form.priority" :min="-1000" :max="1000" style="width: 100%" />
           </el-form-item>
         </div>
         <div class="form-grid">
-          <el-form-item label="启用">
+          <el-form-item :label="t('admin.announcements.enable')">
             <el-switch v-model="form.enabled" />
           </el-form-item>
-          <el-form-item label="可关闭">
+          <el-form-item :label="t('admin.announcements.dismissible')">
             <el-switch v-model="form.dismissible" />
           </el-form-item>
         </div>
         <div class="form-grid">
-          <el-form-item label="开始时间">
+          <el-form-item :label="t('admin.announcements.startsAt')">
             <el-date-picker
               v-model="form.startsAt"
               type="datetime"
@@ -93,7 +98,7 @@
               style="width: 100%"
             />
           </el-form-item>
-          <el-form-item label="结束时间（可选）">
+          <el-form-item :label="t('admin.announcements.endsAt')">
             <el-date-picker
               v-model="form.endsAt"
               type="datetime"
@@ -104,38 +109,38 @@
           </el-form-item>
         </div>
         <div class="form-grid">
-          <el-form-item label="最低版本（可选）">
-            <el-input v-model="form.minimumVersion" placeholder="如 1.3.0" clearable />
+          <el-form-item :label="t('admin.announcements.minVersion')">
+            <el-input v-model="form.minimumVersion" placeholder="1.3.0" clearable />
           </el-form-item>
-          <el-form-item label="最高版本（不含，可选）">
-            <el-input v-model="form.maximumVersionExclusive" placeholder="如 2.0.0" clearable />
+          <el-form-item :label="t('admin.announcements.maxVersion')">
+            <el-input v-model="form.maximumVersionExclusive" placeholder="2.0.0" clearable />
           </el-form-item>
         </div>
-        <el-form-item label="渠道过滤（逗号分隔，空=全部）">
+        <el-form-item :label="t('admin.announcements.channels')">
           <el-input v-model="form.channelsText" placeholder="stable,beta" clearable />
         </el-form-item>
-        <el-form-item label="平台过滤（逗号分隔，空=全部）">
+        <el-form-item :label="t('admin.announcements.platforms')">
           <el-input v-model="form.platformsText" placeholder="windows,linux,macos" clearable />
         </el-form-item>
-        <el-divider content-position="left">中文内容 (zh-CN)</el-divider>
-        <el-form-item label="标题" required>
+        <el-divider content-position="left">{{ t("admin.announcements.zhContent") }}</el-divider>
+        <el-form-item :label="t('admin.announcements.headline')" required>
           <el-input v-model="form.zhTitle" />
         </el-form-item>
-        <el-form-item label="正文 Markdown" required>
-          <el-input v-model="form.zhBody" type="textarea" :rows="8" placeholder="支持 Markdown" />
+        <el-form-item :label="t('admin.announcements.bodyMd')" required>
+          <el-input v-model="form.zhBody" type="textarea" :rows="8" />
         </el-form-item>
         <div class="form-grid">
-          <el-form-item label="主按钮文案">
-            <el-input v-model="form.zhPrimaryLabel" placeholder="知道了" />
+          <el-form-item :label="t('admin.announcements.primaryLabel')">
+            <el-input v-model="form.zhPrimaryLabel" />
           </el-form-item>
-          <el-form-item label="操作按钮文案">
-            <el-input v-model="form.zhActionLabel" placeholder="查看详情" clearable />
+          <el-form-item :label="t('admin.announcements.actionLabel')">
+            <el-input v-model="form.zhActionLabel" clearable />
           </el-form-item>
         </div>
-        <el-form-item label="操作链接">
+        <el-form-item :label="t('admin.announcements.actionUrl')">
           <el-input v-model="form.zhActionUrl" placeholder="https://..." clearable />
         </el-form-item>
-        <el-divider content-position="left">英文内容 (en-US，可选)</el-divider>
+        <el-divider content-position="left">{{ t("admin.announcements.enContent") }}</el-divider>
         <el-form-item label="Title">
           <el-input v-model="form.enTitle" clearable />
         </el-form-item>
@@ -155,8 +160,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ t("admin.cancel") }}</el-button>
+        <el-button type="primary" :loading="saving" @click="save">{{ t("admin.announcements.save") }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -164,6 +169,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { pluginCenterApi } from "@/api/pluginCenter";
 
@@ -189,6 +195,7 @@ interface AnnouncementRow {
   updated_at: string;
 }
 
+const { t, locale } = useI18n();
 const loading = ref(false);
 const saving = ref(false);
 const actingId = ref("");
@@ -222,7 +229,11 @@ const form = reactive({
 });
 
 const severityLabel = (value: string) =>
-  ({ info: "普通", important: "重要", security: "安全" } as Record<string, string>)[value] ?? value;
+  ({
+    info: t("admin.announcements.severityInfoShort"),
+    important: t("admin.announcements.severityImportantShort"),
+    security: t("admin.announcements.severitySecurityShort")
+  } as Record<string, string>)[value] ?? value;
 const severityType = (value: string): "info" | "warning" | "danger" => {
   if (value === "security") return "danger";
   if (value === "important") return "warning";
@@ -230,7 +241,10 @@ const severityType = (value: string): "info" | "warning" | "danger" => {
 };
 const formatDate = (value: string) =>
   value
-    ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
+    ? new Intl.DateTimeFormat(locale.value === "zh" ? "zh-CN" : "en-US", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(new Date(value))
     : "—";
 const titleOf = (row: AnnouncementRow) =>
   row.localized_content?.["zh-CN"]?.title
@@ -244,7 +258,7 @@ const load = async () => {
     const data = await pluginCenterApi.listAdminAnnouncements();
     announcements.value = (data.announcements ?? []) as unknown as AnnouncementRow[];
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    errorMessage.value = error instanceof Error ? error.message : t("admin.announcements.loadFailed");
   } finally {
     loading.value = false;
   }
@@ -313,7 +327,7 @@ const parseList = (text: string) =>
 
 const save = async () => {
   if (!form.id.trim() || !form.zhTitle.trim() || !form.zhBody.trim()) {
-    ElMessage.warning("请填写 ID、中文标题与正文");
+    ElMessage.warning(t("admin.announcements.loadFailed"));
     return;
   }
   const localizedContent: Record<string, {
@@ -357,11 +371,11 @@ const save = async () => {
       dismissible: form.dismissible,
       localizedContent
     });
-    ElMessage.success("公告已保存");
+    ElMessage.success(t("admin.announcements.saved"));
     dialogVisible.value = false;
     await load();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "保存失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.announcements.saveFailed"));
   } finally {
     saving.value = false;
   }
@@ -396,10 +410,10 @@ const toggleEnabled = async (row: AnnouncementRow) => {
           : {})
       }
     });
-    ElMessage.success(row.enabled ? "已停用" : "已启用");
+    ElMessage.success(row.enabled ? t("admin.announcements.disabledOk") : t("admin.announcements.enabledOk"));
     await load();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "操作失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.announcements.toggleFailed"));
   } finally {
     actingId.value = "";
   }
@@ -407,17 +421,21 @@ const toggleEnabled = async (row: AnnouncementRow) => {
 
 const remove = async (row: AnnouncementRow) => {
   try {
-    await ElMessageBox.confirm(`确定删除公告「${titleOf(row)}」？`, "删除公告", { type: "warning" });
+    await ElMessageBox.confirm(
+      t("admin.announcements.deleteConfirm", { id: titleOf(row) }),
+      t("admin.announcements.remove"),
+      { type: "warning" }
+    );
   } catch {
     return;
   }
   actingId.value = row.id;
   try {
     await pluginCenterApi.deleteAdminAnnouncement(row.id);
-    ElMessage.success("已删除");
+    ElMessage.success(t("admin.announcements.deleted"));
     await load();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "删除失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.announcements.deleteFailed"));
   } finally {
     actingId.value = "";
   }
@@ -440,6 +458,7 @@ onMounted(load);
 .page-heading h1 {
   margin: 8px 0 6px;
   font-size: 28px;
+  color: var(--el-text-color-primary);
 }
 .page-heading p {
   margin: 0;
@@ -462,9 +481,8 @@ onMounted(load);
   grid-template-columns: 1fr 1fr;
   gap: 0 16px;
 }
-@media (max-width: 720px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 640px) {
+  .page-heading { flex-direction: column; }
+  .form-grid { grid-template-columns: 1fr; }
 }
 </style>

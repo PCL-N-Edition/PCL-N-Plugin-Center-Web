@@ -4,22 +4,30 @@
       <div class="hero-orb hero-orb-one"></div>
       <div class="hero-orb hero-orb-two"></div>
       <div class="hero-content">
-        <el-tag effect="dark" round>PCL.N Plugin Platform</el-tag>
-        <h1>让插件发布、审核与分发<br />进入同一条可信链路</h1>
-        <p>发布者工作台与平台管理端共用统一身份、审计记录和安全扫描结果。</p>
+        <el-tag effect="dark" round>{{ t("login.badge") }}</el-tag>
+        <h1 v-html="t('login.heroTitle')"></h1>
+        <p>{{ t("login.heroSubtitle") }}</p>
         <div class="feature-grid">
-          <div><strong>Supabase Auth</strong><span>GitHub OAuth 单点登录</span></div>
-          <div><strong>RLS</strong><span>发布者与管理员数据隔离</span></div>
-          <div><strong>.pnp Scanner</strong><span>独立进程执行包安全检查</span></div>
+          <div><strong>Supabase Auth</strong><span>{{ t("login.featureAuth") }}</span></div>
+          <div><strong>RLS</strong><span>{{ t("login.featureRls") }}</span></div>
+          <div><strong>.pnp Scanner</strong><span>{{ t("login.featureScanner") }}</span></div>
         </div>
       </div>
     </section>
 
     <section class="login-panel">
+      <div class="login-toolbar">
+        <button class="toolbar-btn" type="button" :aria-label="t('market.header.switchTheme')" @click="cycleTheme">
+          <span aria-hidden="true">{{ themeIcon }}</span>
+        </button>
+        <button class="toolbar-btn" type="button" :aria-label="t('market.header.switchLanguage')" @click="toggleLanguage">
+          {{ locale === "zh" ? "EN" : "中文" }}
+        </button>
+      </div>
       <div class="login-card">
         <div class="brand-mark">P</div>
-        <h2>PCL.N 插件中心</h2>
-        <p class="login-copy">使用 GitHub 身份进入发布者工作台。管理员权限由数据库成员关系单独授予。</p>
+        <h2>{{ t("login.title") }}</h2>
+        <p class="login-copy">{{ t("login.copy") }}</p>
         <el-alert
           v-if="errorMessage"
           :title="errorMessage"
@@ -30,12 +38,12 @@
         />
         <div class="legal-block">
           <el-checkbox v-model="acceptedLegal">
-            我已阅读并同意
-            <a :href="legalUrls.terms" target="_blank" rel="noreferrer" @click.stop>《用户服务协议》</a>
-            和
-            <a :href="legalUrls.privacy" target="_blank" rel="noreferrer" @click.stop>《隐私保护协议》</a>
+            {{ t("login.legalPrefix") }}
+            <a :href="legalUrls.terms" target="_blank" rel="noreferrer" @click.stop>{{ t("login.terms") }}</a>
+            {{ t("login.and") }}
+            <a :href="legalUrls.privacy" target="_blank" rel="noreferrer" @click.stop>{{ t("login.privacy") }}</a>
           </el-checkbox>
-          <p class="legal-hint">首次注册 / 登录 N Cloud 前须确认。协议版本 {{ legalVersion }}。</p>
+          <p class="legal-hint">{{ t("login.legalHint", { version: legalVersion }) }}</p>
         </div>
         <el-button
           type="primary"
@@ -45,7 +53,7 @@
           class="oauth-button"
           @click="signIn('github')"
         >
-          <span class="github-icon">GH</span>使用 GitHub 登录
+          <span class="github-icon">GH</span>{{ t("login.github") }}
         </el-button>
         <el-button
           size="large"
@@ -54,17 +62,17 @@
           class="oauth-button microsoft"
           @click="signIn('azure')"
         >
-          <span class="microsoft-icon">M</span>使用 Microsoft 登录
+          <span class="microsoft-icon">M</span>{{ t("login.microsoft") }}
         </el-button>
         <div class="security-note">
           <el-icon><Lock /></el-icon>
-          <span>前端仅使用 Supabase Publishable Key；管理写入由受保护 API 完成。</span>
+          <span>{{ t("login.securityNote") }}</span>
         </div>
         <div class="login-links">
-          <a href="https://pcln.top/market/">浏览插件市场</a>
-          <a href="https://docs.pcln.top/" target="_blank" rel="noreferrer">插件开发文档</a>
+          <a href="https://pcln.top/market/">{{ t("login.market") }}</a>
+          <a href="https://docs.pcln.top/" target="_blank" rel="noreferrer">{{ t("login.docs") }}</a>
           <a href="https://github.com/PCL-N-Edition/PCL-N-Plugin-Center-Web" target="_blank" rel="noreferrer">
-            查看开源管理端
+            {{ t("login.opensource") }}
           </a>
         </div>
       </div>
@@ -73,12 +81,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Lock } from "@element-plus/icons-vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { HOME_URL } from "@/config";
 import { supabase } from "@/lib/supabase";
+import useGlobalStore from "@/stores/modules/global";
 import useUserStore from "@/stores/modules/user";
 import {
   NCLOUD_LEGAL_VERSION,
@@ -92,15 +102,43 @@ import {
   isAuthHost,
   isLocalAuthHost
 } from "@/utils/authHosts";
+import {
+  applyPublicTheme,
+  cyclePublicThemeMode,
+  readPublicThemeMode,
+  writePublicThemeMode,
+  type PublicThemeMode
+} from "@/utils/publicTheme";
 
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
+const globalStore = useGlobalStore();
+const { t, locale } = useI18n();
 const loadingProvider = ref<"github" | "azure" | "">("");
 const errorMessage = ref("");
 const acceptedLegal = ref(hasAcceptedNCloudLegal());
 const legalVersion = NCLOUD_LEGAL_VERSION;
 const legalUrls = legalDocumentUrls;
+const themeMode = ref<PublicThemeMode>(readPublicThemeMode());
+const themeIcon = computed(() =>
+  themeMode.value === "system" ? "◐" : themeMode.value === "dark" ? "☾" : "☀"
+);
+
+applyPublicTheme(themeMode.value);
+
+const cycleTheme = () => {
+  themeMode.value = cyclePublicThemeMode(themeMode.value);
+  writePublicThemeMode(themeMode.value);
+  applyPublicTheme(themeMode.value);
+};
+
+const toggleLanguage = () => {
+  const next = locale.value === "zh" ? "en" : "zh";
+  locale.value = next;
+  globalStore.setGlobalState("language", next);
+  document.documentElement.lang = next === "zh" ? "zh-CN" : "en-US";
+};
 
 const resolvePostLoginRedirect = () => {
   const storedRedirect = sessionStorage.getItem("pcln-login-redirect");
@@ -112,27 +150,32 @@ const resolvePostLoginRedirect = () => {
 };
 
 onMounted(async () => {
+  applyPublicTheme(themeMode.value);
   const storedOAuthError = sessionStorage.getItem("pcln-oauth-error");
   if (route.query.oauthError === "1" && storedOAuthError) {
     sessionStorage.removeItem("pcln-oauth-error");
-    errorMessage.value = `Microsoft 登录失败：${storedOAuthError}`;
+    errorMessage.value = `${t("login.microsoft")}: ${storedOAuthError}`;
     return;
   }
   const oauthError = String(route.query.error_description ?? route.query.error ?? "");
   if (/email|identity|already|registered|exists/i.test(oauthError)) {
     try {
       await ElMessageBox.confirm(
-        "该邮箱已属于另一个 PCL N 在线服务账户。是否登录原账户，然后绑定刚才选择的登录方式？",
-        "账户已存在",
-        { confirmButtonText: "登录原账户并绑定", cancelButtonText: "取消", type: "warning" }
+        t("login.accountExistsBody"),
+        t("login.accountExistsTitle"),
+        {
+          confirmButtonText: t("login.accountExistsConfirm"),
+          cancelButtonText: t("login.cancel"),
+          type: "warning"
+        }
       );
       const attemptedProvider = sessionStorage.getItem("pcln-attempted-provider");
       if (attemptedProvider) sessionStorage.setItem("pcln-pending-link-provider", attemptedProvider);
       await supabase.auth.signOut();
-      errorMessage.value = "请使用原账户登录。登录后将在账户页确认绑定。";
+      errorMessage.value = t("login.useOriginalAccount");
       return;
     } catch {
-      errorMessage.value = "未创建重复账户。你可以使用原账户登录后再绑定此登录方式。";
+      errorMessage.value = t("login.noDuplicateAccount");
       return;
     }
   }
@@ -152,19 +195,19 @@ onMounted(async () => {
     const oauthProvider = route.query.provider;
     if (oauthProvider === "github" || oauthProvider === "azure") {
       if (!acceptedLegal.value) {
-        errorMessage.value = "请先勾选同意用户服务协议与隐私保护协议，再继续登录。";
+        errorMessage.value = t("login.acceptLegalFirst");
         return;
       }
       await signIn(oauthProvider);
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "无法恢复登录会话";
+    errorMessage.value = error instanceof Error ? error.message : t("login.restoreFailed");
   }
 });
 
 const signIn = async (provider: "github" | "azure") => {
   if (!acceptedLegal.value) {
-    ElMessage.warning("请先阅读并勾选同意用户服务协议与隐私保护协议");
+    ElMessage.warning(t("login.acceptLegalWarn"));
     return;
   }
   // Record acceptance at registration/login intent so OAuth callback is not blocked.
@@ -200,6 +243,7 @@ const signIn = async (provider: "github" | "azure") => {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(380px, 0.65fr);
   background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
 }
 
 .login-hero {
@@ -210,6 +254,10 @@ const signIn = async (provider: "github" | "azure") => {
   padding: clamp(48px, 8vw, 120px);
   color: white;
   background: linear-gradient(145deg, #16245d 0%, #334bc2 52%, #6b7ff5 100%);
+}
+
+:global(html.dark .login-hero) {
+  background: linear-gradient(145deg, #0b1024 0%, #1a2a6c 48%, #3d4fad 100%);
 }
 
 .hero-content { position: relative; z-index: 2; max-width: 760px; }
@@ -224,10 +272,39 @@ const signIn = async (provider: "github" | "azure") => {
 .feature-grid strong, .feature-grid span { display: block; }
 .feature-grid span { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,.7); }
 
-.login-panel { display: flex; align-items: center; justify-content: center; padding: 48px; }
+.login-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  background: var(--el-bg-color-page);
+}
+.login-toolbar {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  gap: 8px;
+}
+.toolbar-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 9px;
+  color: var(--el-text-color-primary);
+  background: var(--el-bg-color);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.toolbar-btn:hover {
+  background: var(--el-fill-color-light);
+}
 .login-card { width: min(420px, 100%); text-align: center; }
 .brand-mark { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 18px; color: white; font-size: 28px; font-weight: 800; background: linear-gradient(145deg, #334bc2, #6b7ff5); box-shadow: 0 18px 36px rgba(51,75,194,.25); }
-.login-card h2 { margin: 24px 0 12px; font-size: 28px; }
+.login-card h2 { margin: 24px 0 12px; font-size: 28px; color: var(--el-text-color-primary); }
 .login-copy { margin: 0 0 28px; line-height: 1.75; color: var(--el-text-color-secondary); }
 .login-alert { margin-bottom: 18px; text-align: left; }
 .legal-block {
@@ -236,11 +313,13 @@ const signIn = async (provider: "github" | "azure") => {
   border-radius: 12px;
   text-align: left;
   background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
 }
 .legal-block :deep(.el-checkbox) {
   height: auto;
   align-items: flex-start;
   white-space: normal;
+  color: var(--el-text-color-primary);
 }
 .legal-block a {
   color: var(--el-color-primary);
@@ -254,8 +333,9 @@ const signIn = async (provider: "github" | "azure") => {
 }
 .oauth-button { width: 100%; height: 48px; font-weight: 600; margin: 0 0 12px; }
 .microsoft { color: #fff; border-color: #1769aa; background: #1769aa; }
+.microsoft:hover { color: #fff; border-color: #1a78c2; background: #1a78c2; }
 .microsoft-icon, .github-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; font-size: 10px; background: rgba(255,255,255,.18); }
-.security-note { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0; padding: 14px; border-radius: 12px; text-align: left; font-size: 12px; line-height: 1.6; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); }
+.security-note { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0; padding: 14px; border-radius: 12px; text-align: left; font-size: 12px; line-height: 1.6; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); border: 1px solid var(--el-border-color-lighter); }
 .login-card a { color: var(--el-color-primary); font-size: 13px; }
 .login-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 18px; }
 

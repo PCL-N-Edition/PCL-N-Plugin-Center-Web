@@ -2,57 +2,57 @@
   <div class="center-page">
     <header class="page-heading">
       <div>
-        <el-tag size="small" effect="plain" round>Admin Workspace</el-tag>
-        <h1>审核队列</h1>
-        <p>领取提交后检查包哈希、Manifest 与发布说明，并记录明确的审核决定。</p>
+        <el-tag size="small" effect="plain" round>{{ t("admin.workspace") }}</el-tag>
+        <h1>{{ t("admin.reviews.title") }}</h1>
+        <p>{{ t("admin.reviews.description") }}</p>
       </div>
-      <el-button :loading="loading" @click="loadReviews">刷新</el-button>
+      <el-button :loading="loading" @click="loadReviews">{{ t("admin.refresh") }}</el-button>
     </header>
 
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="data-alert" />
     <el-card shadow="never" class="table-card">
       <el-table v-loading="loading" :data="reviews" stripe>
-        <el-table-column label="插件 ID" min-width="230" prop="version.plugin.plugin_id" />
-        <el-table-column label="版本" prop="version.version" />
-        <el-table-column label="状态">
+        <el-table-column :label="t('admin.reviews.pluginId')" min-width="230" prop="version.plugin.plugin_id" />
+        <el-table-column :label="t('admin.reviews.version')" prop="version.version" />
+        <el-table-column :label="t('admin.reviews.status')">
           <template #default="scope"><el-tag :type="statusType(scope.row.status)" round>{{ statusLabel(scope.row.status) }}</el-tag></template>
         </el-table-column>
-        <el-table-column label="包哈希" min-width="250">
+        <el-table-column :label="t('admin.reviews.packageHash')" min-width="250">
           <template #default="scope"><span class="hash">{{ scope.row.version.package_sha256 }}</span></template>
         </el-table-column>
-        <el-table-column label="发布者说明" min-width="220" prop="publisher_notes" show-overflow-tooltip />
-        <el-table-column label="提交时间" min-width="180">
+        <el-table-column :label="t('admin.reviews.publisherNotes')" min-width="220" prop="publisher_notes" show-overflow-tooltip />
+        <el-table-column :label="t('admin.reviews.submittedAt')" min-width="180">
           <template #default="scope">{{ formatDate(scope.row.submitted_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" min-width="250" fixed="right">
+        <el-table-column :label="t('admin.actions')" min-width="250" fixed="right">
           <template #default="scope">
             <template v-if="['pending', 'in_review'].includes(scope.row.status)">
-              <el-button v-if="scope.row.status === 'pending'" link type="primary" :loading="actingId === scope.row.id" @click="claim(scope.row.id)">领取</el-button>
-              <el-button link type="success" @click="openDecision(scope.row, 'approved')">通过</el-button>
-              <el-button link type="warning" @click="openDecision(scope.row, 'changes_requested')">要求修改</el-button>
-              <el-button link type="danger" @click="openDecision(scope.row, 'rejected')">拒绝</el-button>
+              <el-button v-if="scope.row.status === 'pending'" link type="primary" :loading="actingId === scope.row.id" @click="claim(scope.row.id)">{{ t("admin.reviews.claim") }}</el-button>
+              <el-button link type="success" @click="openDecision(scope.row, 'approved')">{{ t("admin.reviews.approve") }}</el-button>
+              <el-button link type="warning" @click="openDecision(scope.row, 'changes_requested')">{{ t("admin.reviews.requestChanges") }}</el-button>
+              <el-button link type="danger" @click="openDecision(scope.row, 'rejected')">{{ t("admin.reviews.reject") }}</el-button>
             </template>
-            <span v-else>{{ scope.row.decision_reason || "已结束" }}</span>
+            <span v-else>{{ scope.row.decision_reason || t("admin.reviews.closed") }}</span>
           </template>
         </el-table-column>
-        <template #empty><el-empty description="目前没有审核提交" /></template>
+        <template #empty><el-empty :description="t('admin.reviews.empty')" /></template>
       </el-table>
     </el-card>
 
     <el-dialog v-model="decisionDialog" :title="decisionTitle" width="560px" destroy-on-close>
       <el-descriptions v-if="selectedReview" :column="1" border class="review-summary">
-        <el-descriptions-item label="插件">{{ selectedReview.version.plugin.plugin_id }}</el-descriptions-item>
-        <el-descriptions-item label="版本">{{ selectedReview.version.version }}</el-descriptions-item>
+        <el-descriptions-item :label="t('admin.reviews.plugin')">{{ selectedReview.version.plugin.plugin_id }}</el-descriptions-item>
+        <el-descriptions-item :label="t('admin.reviews.version')">{{ selectedReview.version.version }}</el-descriptions-item>
         <el-descriptions-item label="SHA-256"><span class="hash">{{ selectedReview.version.package_sha256 }}</span></el-descriptions-item>
       </el-descriptions>
       <el-form label-position="top">
-        <el-form-item label="审核意见" :required="decision !== 'approved'">
-          <el-input v-model="decisionReason" type="textarea" :rows="5" placeholder="拒绝或要求修改时至少填写 3 个字符" />
+        <el-form-item :label="t('admin.reviews.decisionReason')" :required="decision !== 'approved'">
+          <el-input v-model="decisionReason" type="textarea" :rows="5" :placeholder="t('admin.reviews.decisionReasonHint')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="decisionDialog = false">取消</el-button>
-        <el-button :type="decisionButtonType" :loading="actingId === selectedReview?.id" @click="submitDecision">确认{{ decisionTitle }}</el-button>
+        <el-button @click="decisionDialog = false">{{ t("admin.cancel") }}</el-button>
+        <el-button :type="decisionButtonType" :loading="actingId === selectedReview?.id" @click="submitDecision">{{ t("admin.reviews.confirmPrefix") }}{{ decisionTitle }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
 import { pluginCenterApi } from "@/api/pluginCenter";
 import { supabase } from "@/lib/supabase";
@@ -77,6 +78,7 @@ interface ReviewRow {
   };
 }
 
+const { t, locale } = useI18n();
 const loading = ref(false);
 const errorMessage = ref("");
 const actingId = ref("");
@@ -87,10 +89,10 @@ const decision = ref("approved");
 const decisionReason = ref("");
 
 const decisionTitle = computed(() => ({
-  approved: "通过审核",
-  rejected: "拒绝发布",
-  changes_requested: "要求修改"
-} as Record<string, string>)[decision.value] ?? "审核");
+  approved: t("admin.reviews.approveTitle"),
+  rejected: t("admin.reviews.rejectTitle"),
+  changes_requested: t("admin.reviews.changesTitle")
+} as Record<string, string>)[decision.value] ?? t("admin.reviews.decideTitle"));
 const decisionButtonType = computed<"success" | "warning" | "danger">(() => {
   if (decision.value === "approved") return "success";
   if (decision.value === "changes_requested") return "warning";
@@ -113,10 +115,10 @@ const claim = async (reviewId: string) => {
   actingId.value = reviewId;
   try {
     await pluginCenterApi.claimReview(reviewId);
-    ElMessage.success("已领取审核任务");
+    ElMessage.success(t("admin.reviews.claimSuccess"));
     await loadReviews();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "领取失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.reviews.claimFailed"));
   } finally {
     actingId.value = "";
   }
@@ -132,33 +134,38 @@ const openDecision = (row: ReviewRow, nextDecision: string) => {
 const submitDecision = async () => {
   if (!selectedReview.value) return;
   if (decision.value !== "approved" && decisionReason.value.trim().length < 3) {
-    ElMessage.warning("请填写至少 3 个字符的审核意见");
+    ElMessage.warning(t("admin.reviews.reasonRequired"));
     return;
   }
   actingId.value = selectedReview.value.id;
   try {
     await pluginCenterApi.decideReview(selectedReview.value.id, decision.value, decisionReason.value.trim());
-    ElMessage.success("审核决定已保存");
+    ElMessage.success(t("admin.reviews.decideSuccess"));
     decisionDialog.value = false;
     await loadReviews();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "审核操作失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.reviews.decideFailed"));
   } finally {
     actingId.value = "";
   }
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "待处理", in_review: "审核中", changes_requested: "需修改", approved: "已通过", rejected: "已拒绝", cancelled: "已取消"
+const statusLabel = (status: string) => {
+  const key = `admin.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
 };
-const statusLabel = (status: string) => statusLabels[status] ?? status;
 const statusType = (status: string): "success" | "warning" | "danger" | "info" => {
   if (status === "approved") return "success";
   if (status === "rejected") return "danger";
   if (["pending", "in_review", "changes_requested"].includes(status)) return "warning";
   return "info";
 };
-const formatDate = (value: string) => new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat(locale.value === "zh" ? "zh-CN" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 
 onMounted(loadReviews);
 </script>
@@ -166,7 +173,7 @@ onMounted(loadReviews);
 <style scoped lang="scss">
 .center-page { padding: 4px; }
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
-.page-heading h1 { margin: 10px 0 8px; font-size: 26px; }
+.page-heading h1 { margin: 10px 0 8px; font-size: 26px; color: var(--el-text-color-primary); }
 .page-heading p { margin: 0; line-height: 1.7; color: var(--el-text-color-secondary); }
 .data-alert { margin-bottom: 16px; }
 .table-card { border-radius: 14px; }

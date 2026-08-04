@@ -2,16 +2,13 @@
   <div class="center-page">
     <header class="page-heading">
       <div>
-        <el-tag size="small" effect="plain" round>Admin Workspace</el-tag>
-        <h1>管理员</h1>
-        <p>
-          仅<strong>超级管理员</strong>可任命或撤销管理员；超级管理员权限不可被撤销、降级或取代。
-          其他管理员可查看列表，不可改成员。
-        </p>
+        <el-tag size="small" effect="plain" round>{{ t("admin.workspace") }}</el-tag>
+        <h1>{{ t("admin.members.title") }}</h1>
+        <p>{{ t("admin.members.description") }}</p>
       </div>
       <div class="heading-actions">
-        <el-button :loading="loading" @click="load">刷新</el-button>
-        <el-button v-if="canManageMembers" type="primary" @click="openAppoint">任命管理员</el-button>
+        <el-button :loading="loading" @click="load">{{ t("admin.refresh") }}</el-button>
+        <el-button v-if="canManageMembers" type="primary" @click="openAppoint">{{ t("admin.members.appoint") }}</el-button>
       </div>
     </header>
 
@@ -21,36 +18,36 @@
       show-icon
       :closable="false"
       class="data-alert"
-      title="当前账号不是超级管理员，仅可查看管理员列表，不能任命或撤销。"
+      :title="t('admin.members.viewOnlyHint')"
     />
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="data-alert" />
 
     <el-card shadow="never" class="table-card">
       <el-table v-loading="loading" :data="members" stripe>
-        <el-table-column label="显示名称" min-width="180">
+        <el-table-column :label="t('admin.members.displayName')" min-width="180">
           <template #default="scope">
             <span>{{ scope.row.displayName }}</span>
             <el-tag v-if="scope.row.isSuperAdmin" type="danger" effect="dark" round size="small" class="super-tag">
-              超级管理员
+              {{ t("admin.members.superAdmin") }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="GitHub" min-width="140">
+        <el-table-column :label="t('admin.members.github')" min-width="140">
           <template #default="scope">{{ scope.row.githubLogin || "—" }}</template>
         </el-table-column>
-        <el-table-column label="邮箱" min-width="200">
+        <el-table-column :label="t('admin.members.email')" min-width="200">
           <template #default="scope">{{ scope.row.email || "—" }}</template>
         </el-table-column>
-        <el-table-column label="角色" width="120">
+        <el-table-column :label="t('admin.members.role')" width="120">
           <template #default="scope">
             <el-tag :type="roleType(scope.row)" round effect="light">{{ roleLabel(scope.row) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="用户 UUID" min-width="280" prop="userId" />
-        <el-table-column label="任命时间" min-width="180">
+        <el-table-column :label="t('admin.members.userId')" min-width="280" prop="userId" />
+        <el-table-column :label="t('admin.members.appointedAt')" min-width="180">
           <template #default="scope">{{ formatDate(scope.row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column :label="t('admin.actions')" width="120" fixed="right">
           <template #default="scope">
             <template v-if="canManageMembers && !scope.row.isSuperAdmin">
               <el-button
@@ -58,38 +55,38 @@
                 type="danger"
                 :loading="actingId === scope.row.userId"
                 @click="revoke(scope.row)"
-              >撤销</el-button>
+              >{{ t("admin.members.revoke") }}</el-button>
             </template>
-            <span v-else-if="scope.row.isSuperAdmin" class="muted">不可撤销</span>
+            <span v-else-if="scope.row.isSuperAdmin" class="muted">{{ t("admin.members.irrevocable") }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <template #empty><el-empty description="暂无管理员" /></template>
+        <template #empty><el-empty :description="t('admin.members.empty')" /></template>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="appointVisible" title="任命管理员" width="520px" destroy-on-close>
+    <el-dialog v-model="appointVisible" :title="t('admin.members.appoint')" width="520px" destroy-on-close>
       <el-form label-position="top">
-        <el-form-item label="用户 UUID" required>
-          <el-input v-model="appointUserId" placeholder="从「用户」页复制 user_id" clearable />
+        <el-form-item :label="t('admin.members.userId')" required>
+          <el-input v-model="appointUserId" :placeholder="t('admin.members.userIdPlaceholder')" clearable />
         </el-form-item>
-        <el-form-item label="角色" required>
+        <el-form-item :label="t('admin.members.role')" required>
           <el-select v-model="appointRole" style="width: 100%">
-            <el-option label="管理员 (admin)" value="admin" />
-            <el-option label="审核员 (reviewer)" value="reviewer" />
-            <el-option label="审计员 (auditor)" value="auditor" />
+            <el-option :label="t('admin.members.roleAdmin')" value="admin" />
+            <el-option :label="t('admin.members.roleReviewer')" value="reviewer" />
+            <el-option :label="t('admin.members.roleAuditor')" value="auditor" />
           </el-select>
         </el-form-item>
         <el-alert
           type="info"
           :closable="false"
           show-icon
-          title="请先让对方使用 GitHub 登录一次插件中心，再在用户列表中复制其 UUID。超级管理员身份不可通过任命转移。"
+          :title="t('admin.members.appointHint')"
         />
       </el-form>
       <template #footer>
-        <el-button @click="appointVisible = false">取消</el-button>
-        <el-button type="primary" :loading="appointing" @click="appoint">确认任命</el-button>
+        <el-button @click="appointVisible = false">{{ t("admin.cancel") }}</el-button>
+        <el-button type="primary" :loading="appointing" @click="appoint">{{ t("admin.members.confirmAppoint") }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -97,6 +94,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { pluginCenterApi } from "@/api/pluginCenter";
 
@@ -112,6 +110,7 @@ interface AdminMember {
   isSuperAdmin?: boolean;
 }
 
+const { t, locale } = useI18n();
 const loading = ref(false);
 const errorMessage = ref("");
 const members = ref<AdminMember[]>([]);
@@ -123,9 +122,12 @@ const appointUserId = ref("");
 const appointRole = ref<"admin" | "reviewer" | "auditor">("admin");
 
 const roleLabel = (member: AdminMember) => {
-  if (member.isSuperAdmin) return "超级管理员";
-  return ({ admin: "管理员", reviewer: "审核员", auditor: "审计员" } as Record<string, string>)[member.role]
-    ?? member.role;
+  if (member.isSuperAdmin) return t("admin.members.superAdmin");
+  return ({
+    admin: t("admin.members.roleAdminShort"),
+    reviewer: t("admin.members.roleReviewerShort"),
+    auditor: t("admin.members.roleAuditorShort")
+  } as Record<string, string>)[member.role] ?? member.role;
 };
 const roleType = (member: AdminMember): "danger" | "warning" | "info" => {
   if (member.isSuperAdmin || member.role === "admin") return "danger";
@@ -134,7 +136,10 @@ const roleType = (member: AdminMember): "danger" | "warning" | "info" => {
 };
 const formatDate = (value: string) =>
   value
-    ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
+    ? new Intl.DateTimeFormat(locale.value === "zh" ? "zh-CN" : "en-US", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(new Date(value))
     : "—";
 
 const load = async () => {
@@ -145,7 +150,7 @@ const load = async () => {
     members.value = data.members ?? [];
     canManageMembers.value = Boolean(data.canManageMembers);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    errorMessage.value = error instanceof Error ? error.message : t("admin.members.loadFailed");
   } finally {
     loading.value = false;
   }
@@ -153,7 +158,7 @@ const load = async () => {
 
 const openAppoint = () => {
   if (!canManageMembers.value) {
-    ElMessage.warning("仅超级管理员可任命管理员");
+    ElMessage.warning(t("admin.members.onlySuperCanAppoint"));
     return;
   }
   appointUserId.value = "";
@@ -164,17 +169,17 @@ const openAppoint = () => {
 const appoint = async () => {
   const userId = appointUserId.value.trim();
   if (!/^[0-9a-f-]{36}$/i.test(userId)) {
-    ElMessage.warning("请输入有效的用户 UUID");
+    ElMessage.warning(t("admin.members.invalidUuid"));
     return;
   }
   appointing.value = true;
   try {
     await pluginCenterApi.appointAdminMember(userId, appointRole.value);
-    ElMessage.success("已任命");
+    ElMessage.success(t("admin.members.appointed"));
     appointVisible.value = false;
     await load();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "任命失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.members.appointFailed"));
   } finally {
     appointing.value = false;
   }
@@ -182,13 +187,13 @@ const appoint = async () => {
 
 const revoke = async (member: AdminMember) => {
   if (member.isSuperAdmin) {
-    ElMessage.warning("超级管理员不可撤销");
+    ElMessage.warning(t("admin.members.superIrrevocable"));
     return;
   }
   try {
     await ElMessageBox.confirm(
-      `确定撤销 ${member.displayName}（${roleLabel(member)}）的管理权限？`,
-      "撤销管理员",
+      t("admin.members.revokeConfirm", { name: member.displayName, role: roleLabel(member) }),
+      t("admin.members.revokeTitle"),
       { type: "warning" }
     );
   } catch {
@@ -197,10 +202,10 @@ const revoke = async (member: AdminMember) => {
   actingId.value = member.userId;
   try {
     await pluginCenterApi.revokeAdminMember(member.userId);
-    ElMessage.success("已撤销");
+    ElMessage.success(t("admin.members.revoked"));
     await load();
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "撤销失败");
+    ElMessage.error(error instanceof Error ? error.message : t("admin.members.revokeFailed"));
   } finally {
     actingId.value = "";
   }
@@ -223,6 +228,7 @@ onMounted(load);
 .page-heading h1 {
   margin: 8px 0 6px;
   font-size: 28px;
+  color: var(--el-text-color-primary);
 }
 .page-heading p {
   margin: 0;

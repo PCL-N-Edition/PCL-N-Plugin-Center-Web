@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import { useTheme } from "@/utils/theme.ts";
 import useGlobalStore from "@/stores/modules/global.ts";
+import { writePublicThemeMode } from "@/utils/publicTheme.ts";
 
 const globalStore = useGlobalStore();
 const { switchDark } = useTheme();
@@ -36,6 +37,7 @@ const handleSwitchDark = async (event: MouseEvent) => {
     /** 明亮和暗黑模式核心逻辑 */
     // 定义图标切换变量(true-月亮，false-太阳)
     globalStore.setGlobalState("isDark", !globalStore.isDark);
+    writePublicThemeMode(globalStore.isDark ? "dark" : "light");
     switchDark();
     /** 明亮和暗黑模式核心逻辑 */
   } else {
@@ -44,6 +46,7 @@ const handleSwitchDark = async (event: MouseEvent) => {
       /** 明亮和暗黑模式核心逻辑 */
       // 定义图标切换变量(true-月亮，false-太阳)
       globalStore.setGlobalState("isDark", !globalStore.isDark);
+      writePublicThemeMode(globalStore.isDark ? "dark" : "light");
       switchDark();
       /** 明亮和暗黑模式核心逻辑 */
     });

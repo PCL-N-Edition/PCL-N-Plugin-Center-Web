@@ -1,3 +1,9 @@
 # Cloudflare Pages SPA fallback (history-mode Vue Router).
-# Existing static files still take precedence over this rule.
+# Explicit shells first so dual-host auth handoff never 404s when directory index is off.
+/auth/callback      /auth/callback/index.html   200
+/auth/callback/     /auth/callback/index.html   200
+/auth/callback/*    /auth/callback/index.html   200
+/login              /login/index.html           200
+/login/             /login/index.html           200
+# Existing static files still take precedence over this catch-all.
 /*    /index.html   200

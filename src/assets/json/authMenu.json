@@ -4,7 +4,7 @@
   "data": [
     {
       "menuId": 100,
-      "menuName": "发布者工作台",
+      "menuName": "menu.publisher.workspace",
       "parentId": 0,
       "menuType": "1",
       "path": "/publisher",
@@ -19,7 +19,7 @@
     },
     {
       "menuId": 101,
-      "menuName": "插件",
+      "menuName": "menu.publisher.plugins",
       "parentId": 100,
       "menuType": "2",
       "path": "/publisher/plugins",
@@ -33,7 +33,7 @@
     },
     {
       "menuId": 102,
-      "menuName": "版本",
+      "menuName": "menu.publisher.releases",
       "parentId": 100,
       "menuType": "2",
       "path": "/publisher/releases",
@@ -47,7 +47,7 @@
     },
     {
       "menuId": 103,
-      "menuName": "审核记录",
+      "menuName": "menu.publisher.submissions",
       "parentId": 100,
       "menuType": "2",
       "path": "/publisher/submissions",
@@ -61,7 +61,7 @@
     },
     {
       "menuId": 104,
-      "menuName": "组织与命名空间",
+      "menuName": "menu.publisher.organization",
       "parentId": 100,
       "menuType": "2",
       "path": "/publisher/organization",
@@ -75,7 +75,7 @@
     },
     {
       "menuId": 105,
-      "menuName": "收入与提现",
+      "menuName": "menu.publisher.finance",
       "parentId": 100,
       "menuType": "2",
       "path": "/publisher/finance",
@@ -89,7 +89,7 @@
     },
     {
       "menuId": 200,
-      "menuName": "平台管理",
+      "menuName": "menu.admin.workspace",
       "parentId": 0,
       "menuType": "1",
       "path": "/admin",
@@ -105,7 +105,7 @@
     },
     {
       "menuId": 201,
-      "menuName": "审核队列",
+      "menuName": "menu.admin.reviews",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/reviews",
@@ -120,7 +120,7 @@
     },
     {
       "menuId": 202,
-      "menuName": "插件目录",
+      "menuName": "menu.admin.plugins",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/plugins",
@@ -135,7 +135,7 @@
     },
     {
       "menuId": 203,
-      "menuName": "发布者",
+      "menuName": "menu.admin.publishers",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/publishers",
@@ -150,7 +150,7 @@
     },
     {
       "menuId": 204,
-      "menuName": "用户",
+      "menuName": "menu.admin.users",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/users",
@@ -165,7 +165,7 @@
     },
     {
       "menuId": 205,
-      "menuName": "提现审核",
+      "menuName": "menu.admin.withdrawals",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/withdrawals",
@@ -180,7 +180,7 @@
     },
     {
       "menuId": 206,
-      "menuName": "管理员",
+      "menuName": "menu.admin.members",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/members",
@@ -195,7 +195,7 @@
     },
     {
       "menuId": 207,
-      "menuName": "启动器公告",
+      "menuName": "menu.admin.announcements",
       "parentId": 200,
       "menuType": "2",
       "path": "/admin/announcements",
