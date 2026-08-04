@@ -508,13 +508,23 @@ export interface LauncherVersionsResult {
   generatedAt?: string;
 }
 
+export type FetchLauncherVersionsOptions = {
+  signal?: AbortSignal;
+  /**
+   * Force the edge function to re-query GitHub (skip isolate memory cache).
+   * Default true — download page always wants a live sync pull.
+   */
+  forceRefresh?: boolean;
+};
+
 /**
  * Fetch launcher versions from the Plugin Center edge API.
  * Server-side discovery avoids browser CORS limits on github.com.
  */
 export async function fetchLauncherVersionsFromApi(
-  signal?: AbortSignal
+  options: FetchLauncherVersionsOptions = {}
 ): Promise<{ versions: ReleaseVersion[]; generatedAt?: string; source?: string }> {
+  const { signal, forceRefresh = true } = options;
   const base = String(import.meta.env.VITE_WEB_BASE_API || "").replace(/\/+$/, "");
   if (!base) throw new Error("VITE_WEB_BASE_API is not configured");
 
@@ -527,8 +537,12 @@ export async function fetchLauncherVersionsFromApi(
     headers.Authorization = `Bearer ${publishable}`;
   }
 
-  const response = await fetch(`${base}/v1/launcher/releases`, {
-    cache: "no-cache",
+  const url = new URL(`${base}/v1/launcher/releases`);
+  // Sync pull: edge re-fetches GitHub instead of serving a previous memory snapshot.
+  if (forceRefresh) url.searchParams.set("refresh", "1");
+
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
     signal,
     headers
   });
@@ -551,17 +565,26 @@ export async function fetchLauncherVersionsFromApi(
   };
 }
 
-export async function fetchLauncherVersions(signal?: AbortSignal): Promise<ReleaseVersion[]> {
-  const result = await fetchLauncherVersionsWithSource(signal);
+export async function fetchLauncherVersions(
+  signal?: AbortSignal,
+  options?: Omit<FetchLauncherVersionsOptions, "signal">
+): Promise<ReleaseVersion[]> {
+  const result = await fetchLauncherVersionsWithSource({ signal, ...options });
   return result.versions;
 }
 
-/** Same as fetchLauncherVersions but reports which backend path won (for UI status). */
+/**
+ * Sync pull from Plugin Center API only (forceRefresh by default).
+ * Fallback chain is used only when the API is unreachable.
+ */
 export async function fetchLauncherVersionsWithSource(
-  signal?: AbortSignal
+  options: FetchLauncherVersionsOptions = {}
 ): Promise<LauncherVersionsResult> {
+  const { signal, forceRefresh = true } = options;
+
+  // 1) Synchronous live pull via backend (primary).
   try {
-    const remote = await fetchLauncherVersionsFromApi(signal);
+    const remote = await fetchLauncherVersionsFromApi({ signal, forceRefresh });
     return {
       versions: remote.versions,
       source: "api",
@@ -571,6 +594,7 @@ export async function fetchLauncherVersionsWithSource(
     console.warn("[download] Plugin Center launcher releases API failed:", err);
   }
 
+  // 2) Emergency: direct GitHub (usually blocked by browser CORS).
   try {
     const remote = await fetchLauncherVersionsFromGitHub(signal);
     return {
@@ -581,13 +605,14 @@ export async function fetchLauncherVersionsWithSource(
     console.warn("[download] Direct GitHub Atom/latest discovery failed:", err);
   }
 
+  // 3) Build-time snapshot / baked fallbacks.
   try {
     const catalogUrl = `${import.meta.env.BASE_URL || "/"}launcher-releases.json`.replace(
       /\/{2,}/g,
       "/"
     );
     const response = await fetch(catalogUrl, {
-      cache: "no-cache",
+      cache: "no-store",
       signal,
       headers: { Accept: "application/json" }
     });

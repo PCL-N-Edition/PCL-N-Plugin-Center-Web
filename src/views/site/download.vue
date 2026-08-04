@@ -118,8 +118,8 @@
               type="button"
               role="radio"
               :aria-checked="ch.id === selectedChannel"
-              :class="{ selected: ch.id === selectedChannel, disabled: !channelHasVersions(ch.id) }"
-              :disabled="!channelHasVersions(ch.id)"
+              :class="{ selected: ch.id === selectedChannel, disabled: catalogLoading || !channelHasVersions(ch.id) }"
+              :disabled="catalogLoading || !channelHasVersions(ch.id)"
               @click="selectChannel(ch.id)"
             >
               <b>{{ ch.label }}</b>
@@ -138,6 +138,8 @@
             class="version-select"
             size="large"
             filterable
+            :loading="catalogLoading"
+            :disabled="catalogLoading || !channelVersions.length"
             :placeholder="t('site.download.versionPlaceholder')"
           >
             <el-option
@@ -303,12 +305,14 @@ const channels = computed(() => [
   { id: "ci" as const, label: t("site.download.ci") }
 ]);
 
-const versions = ref<ReleaseVersion[]>(FALLBACK_VERSIONS);
+/** Empty until sync API pull finishes — avoid showing a stale baked-in list first. */
+const versions = ref<ReleaseVersion[]>([]);
+const catalogLoading = ref(true);
 const catalogStatus = ref("");
 const dialogVisible = ref(false);
 const selectedPlatformId = ref<PlatformId>("windows");
 const selectedChannel = ref<ReleaseChannel>("beta");
-const selectedVersionId = ref(FALLBACK_VERSIONS.find(v => v.channel === "beta")?.id ?? FALLBACK_VERSIONS[0].id);
+const selectedVersionId = ref("");
 const selectedArch = ref("x64");
 const includeRuntime = ref(true);
 const includePlugin = ref(true);
@@ -478,10 +482,15 @@ watch(selectedChannel, ch => {
 let abort: AbortController | null = null;
 
 onMounted(async () => {
+  catalogLoading.value = true;
   catalogStatus.value = t("site.download.catalogLoading");
   abort = new AbortController();
   try {
-    const result = await fetchLauncherVersionsWithSource(abort.signal);
+    // Always forceRefresh: edge re-queries GitHub (no isolate memory snapshot).
+    const result = await fetchLauncherVersionsWithSource({
+      signal: abort.signal,
+      forceRefresh: true
+    });
     const remote = result.versions;
     if (remote.length) {
       versions.value = remote;
@@ -491,6 +500,8 @@ onMounted(async () => {
       if (first) {
         selectedChannel.value = first.channel;
         selectedVersionId.value = first.id;
+      } else {
+        selectedVersionId.value = remote[0]?.id ?? "";
       }
       if (result.source === "api") {
         catalogStatus.value = t("site.download.catalogReadyApi", { count: remote.length });
@@ -502,10 +513,18 @@ onMounted(async () => {
         catalogStatus.value = t("site.download.catalogFallback");
       }
     } else {
+      versions.value = FALLBACK_VERSIONS.map(v => ({ ...v }));
+      selectedVersionId.value =
+        FALLBACK_VERSIONS.find(v => v.channel === "beta")?.id ?? FALLBACK_VERSIONS[0]?.id ?? "";
       catalogStatus.value = t("site.download.catalogFallback");
     }
   } catch {
+    versions.value = FALLBACK_VERSIONS.map(v => ({ ...v }));
+    selectedVersionId.value =
+      FALLBACK_VERSIONS.find(v => v.channel === "beta")?.id ?? FALLBACK_VERSIONS[0]?.id ?? "";
     catalogStatus.value = t("site.download.catalogFallback");
+  } finally {
+    catalogLoading.value = false;
   }
 });
 
