@@ -550,11 +550,7 @@ onMounted(async () => {
   catalogStatus.value = t("site.download.catalogLoading");
   abort = new AbortController();
   try {
-    // Always forceRefresh: edge re-queries GitHub (no isolate memory snapshot).
-    const result = await fetchLauncherVersionsWithSource({
-      signal: abort.signal,
-      forceRefresh: true
-    });
+    const result = await fetchLauncherVersionsWithSource({ signal: abort.signal });
     const remote = result.versions;
     if (remote.length) {
       versions.value = remote;
@@ -567,12 +563,10 @@ onMounted(async () => {
       } else {
         selectedVersionId.value = remote[0]?.id ?? "";
       }
-      if (result.source === "api") {
+      if (result.source === "cloudflare") {
         catalogStatus.value = t("site.download.catalogReadyApi", { count: remote.length });
       } else if (result.source === "static") {
         catalogStatus.value = t("site.download.catalogReadyStatic", { count: remote.length });
-      } else if (result.source === "github") {
-        catalogStatus.value = t("site.download.catalogReady", { count: remote.length });
       } else {
         catalogStatus.value = t("site.download.catalogFallback");
       }

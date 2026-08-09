@@ -101,7 +101,7 @@ pnpm build:prod
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_WEB_BASE_API`
+- `VITE_WEB_BASE_API`（生产固定为 `https://api.pcln.top`；版本目录由 Cloudflare R2/D1 提供，其余尚未迁移接口由 Worker 兼容回源）
 
 ### 本地手动发布
 

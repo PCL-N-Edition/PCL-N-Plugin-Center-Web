@@ -46,9 +46,6 @@ jobs:
           if [ -n "${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
             export VITE_SUPABASE_PUBLISHABLE_KEY='${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}'
           fi
-          if [ -n "${{ vars.VITE_WEB_BASE_API }}" ]; then
-            export VITE_WEB_BASE_API='${{ vars.VITE_WEB_BASE_API }}'
-          fi
           pnpm build:prod
 
       - name: Verify SPA hosting files

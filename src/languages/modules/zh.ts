@@ -390,7 +390,7 @@ export default {
       catalogLoadingShort: "同步中…",
       catalogLoadingHint: "版本列表加载完成后即可选择并下载",
       catalogReady: "已获取 {count} 个版本（GitHub）",
-      catalogReadyApi: "已同步 {count} 个版本（API）",
+      catalogReadyApi: "已同步 {count} 个版本（Cloudflare）",
       catalogReadyStatic: "已获取 {count} 个版本（站点缓存）",
       catalogFallback: "在线版本源暂不可用，已使用备用版本列表",
       stable: "正式版",

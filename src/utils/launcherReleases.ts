@@ -1,13 +1,12 @@
 /**
  * Web version discovery:
  *
- *   1) Plugin Center API  GET /v1/launcher/releases  (server-side GitHub refresh + cache)
+ *   1) Cloudflare Worker GET /v1/launcher/releases  (R2/D1 catalog)
  *   2) Same-origin public/launcher-releases.json     (build-time snapshot)
  *   3) Baked FALLBACK_VERSIONS
  *
- * Direct browser → github.com Atom is not used (no CORS). The edge function
- * polls GitHub on the server so the download page stays current without a
- * website redeploy.
+ * Version discovery never depends on Supabase or a browser-to-GitHub request.
+ * Release workflows publish the catalog to Cloudflare after assets are ready.
  */
 
 export type ReleaseChannel = "release" | "beta" | "ci";
@@ -483,11 +482,9 @@ export async function fetchLauncherVersionsFromGitHub(
 }
 
 /**
- * Primary: Plugin Center backend API (server refreshes GitHub, short cache).
- * Secondary: same-origin catalog generated at build time.
+ * Primary: Cloudflare R2/D1 catalog exposed by the Worker.
+ * Secondary: same-origin catalog generated from that endpoint at build time.
  * Last: baked-in FALLBACK_VERSIONS.
- * Direct browser GitHub Atom remains available as an emergency probe only
- * (usually blocked by CORS in production).
  */
 /** Normalize packaging flags so build-time catalogs cannot leave installers disabled. */
 export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
@@ -500,7 +497,7 @@ export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
   };
 }
 
-export type LauncherVersionsSource = "api" | "static" | "github" | "fallback";
+export type LauncherVersionsSource = "cloudflare" | "static" | "fallback";
 
 export interface LauncherVersionsResult {
   versions: ReleaseVersion[];
@@ -510,41 +507,24 @@ export interface LauncherVersionsResult {
 
 export type FetchLauncherVersionsOptions = {
   signal?: AbortSignal;
-  /**
-   * Force the edge function to re-query GitHub (skip isolate memory cache).
-   * Default true — download page always wants a live sync pull.
-   */
-  forceRefresh?: boolean;
 };
 
 /**
- * Fetch launcher versions from the Plugin Center edge API.
- * Server-side discovery avoids browser CORS limits on github.com.
+ * Fetch launcher versions from the public Cloudflare catalog endpoint.
  */
 export async function fetchLauncherVersionsFromApi(
   options: FetchLauncherVersionsOptions = {}
 ): Promise<{ versions: ReleaseVersion[]; generatedAt?: string; source?: string }> {
-  const { signal, forceRefresh = true } = options;
+  const { signal } = options;
   const base = String(import.meta.env.VITE_WEB_BASE_API || "").replace(/\/+$/, "");
   if (!base) throw new Error("VITE_WEB_BASE_API is not configured");
 
-  const headers: Record<string, string> = {
-    Accept: "application/json"
-  };
-  const publishable = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (publishable) {
-    headers.apikey = publishable;
-    headers.Authorization = `Bearer ${publishable}`;
-  }
-
   const url = new URL(`${base}/v1/launcher/releases`);
-  // Sync pull: edge re-fetches GitHub instead of serving a previous memory snapshot.
-  if (forceRefresh) url.searchParams.set("refresh", "1");
 
   const response = await fetch(url.toString(), {
     cache: "no-store",
     signal,
-    headers
+    headers: { Accept: "application/json" }
   });
   if (!response.ok) {
     throw new Error(`launcher releases API HTTP ${response.status}`);
@@ -580,32 +560,21 @@ export async function fetchLauncherVersions(
 export async function fetchLauncherVersionsWithSource(
   options: FetchLauncherVersionsOptions = {}
 ): Promise<LauncherVersionsResult> {
-  const { signal, forceRefresh = true } = options;
+  const { signal } = options;
 
-  // 1) Synchronous live pull via backend (primary).
+  // 1) Cloudflare-owned catalog (primary).
   try {
-    const remote = await fetchLauncherVersionsFromApi({ signal, forceRefresh });
+    const remote = await fetchLauncherVersionsFromApi({ signal });
     return {
       versions: remote.versions,
-      source: "api",
+      source: "cloudflare",
       generatedAt: remote.generatedAt
     };
   } catch (err) {
-    console.warn("[download] Plugin Center launcher releases API failed:", err);
+    console.warn("[download] Cloudflare launcher releases API failed:", err);
   }
 
-  // 2) Emergency: direct GitHub (usually blocked by browser CORS).
-  try {
-    const remote = await fetchLauncherVersionsFromGitHub(signal);
-    return {
-      versions: remote.map(normalizeReleaseVersion),
-      source: "github"
-    };
-  } catch (err) {
-    console.warn("[download] Direct GitHub Atom/latest discovery failed:", err);
-  }
-
-  // 3) Build-time snapshot / baked fallbacks.
+  // 2) Build-time snapshot / baked fallbacks.
   try {
     const catalogUrl = `${import.meta.env.BASE_URL || "/"}launcher-releases.json`.replace(
       /\/{2,}/g,

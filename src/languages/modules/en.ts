@@ -398,7 +398,7 @@ export default {
       catalogLoadingShort: "Syncing…",
       catalogLoadingHint: "You can pick options after the version list finishes loading",
       catalogReady: "Loaded {count} versions (GitHub)",
-      catalogReadyApi: "Synced {count} versions (API)",
+      catalogReadyApi: "Synced {count} versions (Cloudflare)",
       catalogReadyStatic: "Loaded {count} versions (site snapshot)",
       catalogFallback: "Online catalog unavailable; using fallback version list",
       stable: "Release",
