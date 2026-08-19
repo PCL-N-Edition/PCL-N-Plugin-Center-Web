@@ -75,7 +75,6 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { pluginCenterApi } from "@/api/pluginCenter";
-import { supabase } from "@/lib/supabase";
 
 interface Organization { id: string; display_name: string; slug: string; status: string; created_at: string; }
 interface NamespaceRow { id: string; namespace: string; verified: boolean; created_at: string; organization: Organization; }
@@ -90,17 +89,20 @@ const namespaces = ref<NamespaceRow[]>([]);
 const loadData = async () => {
   loading.value = true;
   errorMessage.value = "";
-  const [organizationResult, namespaceResult] = await Promise.all([
-    supabase.from("plugin_center_publisher_organizations").select("*").order("created_at", { ascending: false }),
-    supabase.from("plugin_center_namespaces")
-      .select("id, namespace, verified, created_at, organization:plugin_center_publisher_organizations(id, display_name, slug, status, created_at)")
-      .order("created_at", { ascending: false })
-  ]);
-  const error = organizationResult.error ?? namespaceResult.error;
-  if (error) errorMessage.value = error.message;
-  organizations.value = (organizationResult.data ?? []) as Organization[];
-  namespaces.value = (namespaceResult.data ?? []) as unknown as NamespaceRow[];
-  loading.value = false;
+  try {
+    const [orgRows, nsRows] = await Promise.all([
+      pluginCenterApi.listAdminOrganizations(),
+      pluginCenterApi.listAdminNamespaces()
+    ]);
+    organizations.value = orgRows as Organization[];
+    namespaces.value = nsRows as NamespaceRow[];
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    organizations.value = [];
+    namespaces.value = [];
+  } finally {
+    loading.value = false;
+  }
 };
 
 const toggleOrganization = async (row: Organization) => {

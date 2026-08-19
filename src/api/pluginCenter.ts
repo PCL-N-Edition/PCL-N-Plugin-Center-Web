@@ -305,6 +305,14 @@ export const pluginCenterApi = {
     const body = await request<{ items?: unknown[] } | unknown[]>("/admin/plugins");
     return unwrapItems<Record<string, any>>(body);
   },
+  listAdminOrganizations: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/admin/organizations");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listAdminNamespaces: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/admin/namespaces");
+    return unwrapItems<Record<string, any>>(body);
+  },
   listMyVersions: async () => {
     const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/versions");
     return unwrapItems<Record<string, any>>(body);
