@@ -114,7 +114,10 @@ const linkProvider = async (provider: "github" | "azure") => {
   sessionStorage.setItem("pcln-pending-link-provider", provider);
   const { error } = await supabase.auth.linkIdentity({
     provider,
-    options: { redirectTo: redirectTo.toString(), scopes: provider === "azure" ? "profile email" : undefined }
+    options: {
+      redirectTo: redirectTo.toString(),
+      scopes: provider === "azure" ? "openid profile email offline_access" : undefined
+    }
   });
   if (error) {
     message.value = /manual linking is disabled/i.test(error.message)

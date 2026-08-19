@@ -223,11 +223,23 @@ const signIn = async (provider: "github" | "azure") => {
   // PKCE: start + callback must be same origin → auth.pcln.top/login in production.
   const redirectTo = buildOAuthRedirectTo(target);
   sessionStorage.setItem("pcln-login-redirect", target);
+  // Microsoft: request standard OIDC claims only for login.
+  // XboxLive.signin often breaks code exchange (Unable to exchange external code: M.C…)
+  // unless the Azure app is fully configured for Xbox Live; request it only when
+  // the post-login target is desktop pairing / explicit xbox=1.
+  const wantsXbox =
+    provider === "azure" &&
+    (route.query.xbox === "1" ||
+      target.includes("/desktop/authorize") ||
+      target.includes("/account/authorize"));
+  const azureScopes = wantsXbox
+    ? "openid profile email offline_access XboxLive.signin"
+    : "openid profile email offline_access";
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
       redirectTo,
-      scopes: provider === "azure" ? "profile email offline_access XboxLive.signin" : undefined
+      scopes: provider === "azure" ? azureScopes : undefined
     }
   });
   if (error) {

@@ -80,7 +80,13 @@ const approvePairing = async () => {
     const currentOAuthProvider = sessionStorage.getItem("pcln-current-oauth-provider");
     const providerToken = pairingProvider.value === "azure" && currentOAuthProvider === "azure" ? data.session?.provider_token : undefined;
     if (pairingProvider.value === "azure" && !providerToken) {
-      throw new Error("当前会话缺少 Microsoft Provider Token。请退出后使用 Microsoft 重新登录，再确认此设备。 ");
+      // Force a Microsoft re-login with XboxLive scope for Minecraft pairing.
+      const login = new URL("/login", window.location.origin);
+      login.searchParams.set("provider", "azure");
+      login.searchParams.set("xbox", "1");
+      login.searchParams.set("redirect", `${route.fullPath}`);
+      window.location.assign(login.toString());
+      return;
     }
     await pluginCenterApi.approveDesktopPairing(pairingCode.value, pairingProvider.value, providerToken ?? undefined);
     approved.value = true;
