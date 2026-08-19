@@ -289,6 +289,42 @@ export const pluginCenterApi = {
     `/account/plugins/${pluginId}/grants`, { method: "PUT", body: jsonBody({ scopes }) }),
   deletePluginData: (pluginId: string) => request<{ deleted: number }>(
     `/account/plugins/${pluginId}/data`, { method: "DELETE" }),
+  listMyMemberships: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/memberships");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listMyNamespaces: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/namespaces");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listMyPlugins: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/plugins");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listAdminPlugins: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/admin/plugins");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listMyVersions: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/versions");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  listMyReviews: async () => {
+    const body = await request<{ items?: unknown[] } | unknown[]>("/publisher/me/reviews");
+    return unwrapItems<Record<string, any>>(body);
+  },
+  getPayoutProfile: async (organizationId: string) =>
+    request<{ accountMask: string | null; updatedAt: string | null }>(
+      `/publisher/organizations/${organizationId}/payout-profile`,
+      {},
+      true
+    ),
+  listWithdrawals: async (organizationId: string) => {
+    const body = await request<{ items?: unknown[] } | unknown[]>(
+      `/publisher/organizations/${organizationId}/withdrawals`
+    );
+    return unwrapItems<Record<string, any>>(body);
+  },
   createOrganization: (input: CreateOrganizationInput) => request<Record<string, unknown>>(
     "/publisher/organizations",
     { method: "POST", body: jsonBody(input) }

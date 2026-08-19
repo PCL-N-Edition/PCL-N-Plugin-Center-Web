@@ -96,7 +96,6 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { pluginCenterApi } from "@/api/pluginCenter";
-import { supabase } from "@/lib/supabase";
 
 interface Organization {
   id: string;
@@ -136,24 +135,23 @@ const editableOrganizations = computed(() => memberships.value.filter(
 const loadData = async () => {
   loading.value = true;
   errorMessage.value = "";
-  const [memberResult, namespaceResult] = await Promise.all([
-    supabase
-      .from("plugin_center_publisher_members")
-      .select("role, created_at, organization:plugin_center_publisher_organizations(id, slug, display_name, status)")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("plugin_center_namespaces")
-      .select("id, namespace, verified, created_at, organization:plugin_center_publisher_organizations(id, slug, display_name, status)")
-      .order("created_at", { ascending: false })
-  ]);
-  const error = memberResult.error ?? namespaceResult.error;
-  if (error) errorMessage.value = error.message;
-  memberships.value = (memberResult.data ?? []) as unknown as Membership[];
-  namespaces.value = (namespaceResult.data ?? []) as unknown as NamespaceRow[];
-  if (!namespaceForm.organizationId && editableOrganizations.value[0]) {
-    namespaceForm.organizationId = editableOrganizations.value[0].organization.id;
+  try {
+    const [memberRows, namespaceRows] = await Promise.all([
+      pluginCenterApi.listMyMemberships(),
+      pluginCenterApi.listMyNamespaces()
+    ]);
+    memberships.value = memberRows as Membership[];
+    namespaces.value = namespaceRows as NamespaceRow[];
+    if (!namespaceForm.organizationId && editableOrganizations.value[0]) {
+      namespaceForm.organizationId = editableOrganizations.value[0].organization.id;
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    memberships.value = [];
+    namespaces.value = [];
+  } finally {
+    loading.value = false;
   }
-  loading.value = false;
 };
 
 const createOrganization = async () => {

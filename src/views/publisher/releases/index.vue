@@ -106,7 +106,6 @@ import { ElMessage, genFileId } from "element-plus";
 import type { UploadInstance, UploadRawFile, UploadUserFile } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
 import { pluginCenterApi } from "@/api/pluginCenter";
-import { supabase } from "@/lib/supabase";
 
 interface PluginRow { id: string; plugin_id: string; display_name: string; }
 interface VersionRow {
@@ -142,17 +141,24 @@ const uploadForm = reactive({
 const loadData = async () => {
   loading.value = true;
   errorMessage.value = "";
-  const [pluginResult, versionResult] = await Promise.all([
-    supabase.from("plugin_center_plugins").select("id, plugin_id, display_name").order("display_name"),
-    supabase.from("plugin_center_plugin_versions")
-      .select("id, version, channel, state, package_sha256, created_at, plugin:plugin_center_plugins(id, plugin_id, display_name)")
-      .order("created_at", { ascending: false })
-  ]);
-  const error = pluginResult.error ?? versionResult.error;
-  if (error) errorMessage.value = error.message;
-  plugins.value = (pluginResult.data ?? []) as PluginRow[];
-  versions.value = (versionResult.data ?? []) as unknown as VersionRow[];
-  loading.value = false;
+  try {
+    const [pluginRows, versionRows] = await Promise.all([
+      pluginCenterApi.listMyPlugins(),
+      pluginCenterApi.listMyVersions()
+    ]);
+    plugins.value = (pluginRows as PluginRow[]).map(row => ({
+      id: row.id,
+      plugin_id: row.plugin_id,
+      display_name: row.display_name
+    }));
+    versions.value = versionRows as VersionRow[];
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    plugins.value = [];
+    versions.value = [];
+  } finally {
+    loading.value = false;
+  }
 };
 
 const openUploadDialog = () => {

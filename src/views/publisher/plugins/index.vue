@@ -118,7 +118,6 @@ import { useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
 import { pluginCenterApi } from "@/api/pluginCenter";
-import { supabase } from "@/lib/supabase";
 
 interface PluginRow {
   id: string;
@@ -191,18 +190,25 @@ const pluginIdPlaceholder = computed(() => {
 const loadData = async () => {
   loading.value = true;
   errorMessage.value = "";
-  const [pluginResult, memberResult, namespaceResult] = await Promise.all([
-    supabase.from("plugin_center_plugins").select("*, translations:plugin_center_plugin_translations(culture,display_name,summary,description)").order("updated_at", { ascending: false }),
-    supabase.from("plugin_center_publisher_members")
-      .select("role, organization:plugin_center_publisher_organizations(id, display_name, status)"),
-    supabase.from("plugin_center_namespaces").select("id, organization_id, namespace, verified")
-  ]);
-  const error = pluginResult.error ?? memberResult.error ?? namespaceResult.error;
-  if (error) errorMessage.value = error.message;
-  plugins.value = (pluginResult.data ?? []) as PluginRow[];
-  memberships.value = (memberResult.data ?? []) as unknown as Membership[];
-  namespaces.value = (namespaceResult.data ?? []) as NamespaceRow[];
-  loading.value = false;
+  try {
+    const [pluginRows, memberRows, namespaceRows] = await Promise.all([
+      isAdminView.value ? pluginCenterApi.listAdminPlugins() : pluginCenterApi.listMyPlugins(),
+      pluginCenterApi.listMyMemberships(),
+      pluginCenterApi.listMyNamespaces()
+    ]);
+    plugins.value = pluginRows as PluginRow[];
+    memberships.value = memberRows as unknown as Membership[];
+    namespaces.value = namespaceRows as NamespaceRow[];
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "加载失败";
+    plugins.value = [];
+    if (!isAdminView.value) {
+      memberships.value = [];
+      namespaces.value = [];
+    }
+  } finally {
+    loading.value = false;
+  }
 };
 
 const resetForm = () => {
