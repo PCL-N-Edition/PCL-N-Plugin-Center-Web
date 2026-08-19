@@ -78,9 +78,67 @@ export class PluginCenterApiError extends Error {
   }
 }
 
-const request = async <T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> => {
-  const headers = new Headers(init.headers);
-  headers.set("apikey", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+const apiBase = () => String(import.meta.env.VITE_WEB_BASE_API || "https://api.pcln.top").replace(/\/+$/, "");
+
+const unwrapItems = <T>(body: unknown): T[] => {
+  if (Array.isArray(body)) return body as T[];
+  if (body && typeof body === "object" && Array.isArray((body as { items?: unknown }).items))
+    return (body as { items: T[] }).items;
+  return [];
+};
+
+const mapCategory = (row: Record<string, unknown>): MarketCategory => ({
+  id: String(row.id ?? row.slug ?? ""),
+  name: String(row.name ?? row.displayName ?? row.display_name ?? row.id ?? ""),
+  description: row.description == null ? undefined : String(row.description)
+});
+
+const mapMarketPlugin = (row: Record<string, unknown>): MarketPlugin => {
+  const pricingModel = String(row.pricingModel ?? row.pricing_model ?? "free") === "one_time"
+    ? "one_time"
+    : "free";
+  const priceCents = Number(row.priceCents ?? row.price_cents ?? 0) || 0;
+  const categories = Array.isArray(row.categories)
+    ? row.categories.map(String)
+    : row.category
+      ? [String(row.category)]
+      : [];
+  const tags = Array.isArray(row.tags) ? row.tags.map(String) : [];
+  const iconUrl = row.iconUrl == null && row.icon_url == null
+    ? undefined
+    : String(row.iconUrl ?? row.icon_url);
+  return {
+    pluginId: String(row.pluginId ?? row.plugin_id ?? row.logical_plugin_id ?? row.slug ?? row.id ?? ""),
+    name: String(row.name ?? row.displayName ?? row.display_name ?? row.pluginId ?? row.slug ?? "Plugin"),
+    summary: row.summary == null ? undefined : String(row.summary),
+    description: row.description == null ? undefined : String(row.description),
+    latestVersion: row.latestVersion == null && row.latest_version == null
+      ? undefined
+      : String(row.latestVersion ?? row.latest_version),
+    publisherId: row.publisherId == null && row.publisher_id == null && row.publisherSlug == null
+      ? undefined
+      : String(row.publisherId ?? row.publisher_id ?? row.publisherSlug),
+    publisherName: row.publisherName == null && row.publisher_name == null && row.publisherDisplayName == null
+      ? undefined
+      : String(row.publisherName ?? row.publisher_name ?? row.publisherDisplayName),
+    category: String(row.category ?? categories[0] ?? "utility"),
+    categories: categories.length ? categories : ["utility"],
+    tags,
+    pricingModel,
+    priceCents,
+    currency: "CNY",
+    requiresPurchase: Boolean(row.requiresPurchase ?? pricingModel === "one_time"),
+    permissions: Array.isArray(row.permissions) ? row.permissions.map(String) : undefined,
+    source: row.source == null ? undefined : String(row.source),
+    iconUrl,
+    culture: row.culture === "en-US" || row.culture === "zh-CN" ? row.culture : undefined
+  };
+};
+
+async function authHeaders(authenticated: boolean, extra?: HeadersInit): Promise<Headers> {
+  const headers = new Headers(extra);
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (publishableKey) headers.set("apikey", publishableKey);
   if (authenticated) {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
@@ -88,9 +146,15 @@ const request = async <T>(path: string, init: RequestInit = {}, authenticated = 
     if (!accessToken) throw new PluginCenterApiError("请先登录", 401);
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
-  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  return headers;
+}
 
-  const response = await fetch(`${import.meta.env.VITE_WEB_BASE_API}/v1${path}`, {
+const request = async <T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> => {
+  const headers = await authHeaders(authenticated, init.headers);
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
+
+  const response = await fetch(`${apiBase()}/v1${path}`, {
     ...init,
     headers
   });
@@ -117,8 +181,7 @@ const request = async <T>(path: string, init: RequestInit = {}, authenticated = 
       `请求失败（HTTP ${response.status}）`;
     if (code === "WORKER_RESOURCE_LIMIT" || String(message).includes("WORKER_RESOURCE_LIMIT")) {
       message =
-        "上传失败：Edge Function 算力/内存不足（WORKER_RESOURCE_LIMIT）。" +
-        "请刷新后重试大包分块上传流程。";
+        "上传失败：API Worker 资源不足（WORKER_RESOURCE_LIMIT）。请刷新后重试分块上传。";
     }
     if (
       String(message).includes("maximum allowed size") ||
@@ -127,13 +190,23 @@ const request = async <T>(path: string, init: RequestInit = {}, authenticated = 
       response.status === 413
     ) {
       message =
-        "Storage 拒绝了对象大小（通常是 Supabase Free 单文件 50 MB 硬限制）。" +
-        "请刷新页面后重试：前端会对 >50 MB 的 .pnp 自动拆成 40 MB 分块上传。";
+        "对象超过单分块大小限制。请刷新页面后重试：大包会自动拆成多分块经 api.pcln.top 上传。";
     }
     throw new PluginCenterApiError(message, response.status);
   }
   return body as T;
 };
+
+async function uploadBytesToWorker(uploadUri: string, blob: Blob, sha256: string): Promise<void> {
+  const headers = await authHeaders(true);
+  headers.set("Content-Type", "application/octet-stream");
+  headers.set("x-content-sha256", sha256);
+  const response = await fetch(uploadUri, { method: "PUT", headers, body: blob });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new PluginCenterApiError(text.slice(0, 300) || `上传失败（HTTP ${response.status}）`, response.status);
+  }
+}
 
 /** Browser SHA-256 of a File/Blob as lowercase hex (for direct Storage upload sessions). */
 export async function sha256Hex(blob: Blob): Promise<string> {
@@ -145,18 +218,47 @@ export async function sha256Hex(blob: Blob): Promise<string> {
 const jsonBody = (value: unknown) => JSON.stringify(value);
 
 export const pluginCenterApi = {
-  listMarketPlugins: (query: { search?: string; category?: string; locale?: string; skip?: number; take?: number } = {}) => {
+  listMarketPlugins: async (query: { search?: string; category?: string; locale?: string; skip?: number; take?: number } = {}) => {
     const parameters = new URLSearchParams();
     if (query.search) parameters.set("search", query.search);
     if (query.category) parameters.set("category", query.category);
     if (query.locale) parameters.set("locale", query.locale);
+    parameters.set("status", "published");
     parameters.set("skip", String(query.skip ?? 0));
     parameters.set("take", String(query.take ?? 50));
-    return request<MarketPlugin[]>(`/plugins?${parameters}`, {}, false);
+    parameters.set("offset", String(query.skip ?? 0));
+    parameters.set("limit", String(query.take ?? 50));
+    const body = await request<unknown>(`/plugins?${parameters}`, {}, false);
+    let items = unwrapItems<Record<string, unknown>>(body).map(mapMarketPlugin);
+    if (query.search?.trim()) {
+      const needle = query.search.trim().toLowerCase();
+      items = items.filter(plugin =>
+        plugin.name.toLowerCase().includes(needle) ||
+        plugin.pluginId.toLowerCase().includes(needle) ||
+        (plugin.summary ?? "").toLowerCase().includes(needle)
+      );
+    }
+    if (query.category?.trim()) {
+      const category = query.category.trim();
+      items = items.filter(plugin => plugin.category === category || plugin.categories.includes(category));
+    }
+    return items;
   },
-  getMarketPlugin: (pluginId: string, locale?: string) => request<MarketPlugin>(
-    `/plugins/${encodeURIComponent(pluginId)}${locale ? `?locale=${encodeURIComponent(locale)}` : ""}`, {}, false),
-  listCategories: () => request<MarketCategory[]>("/categories", {}, false),
+  getMarketPlugin: async (pluginId: string, locale?: string) => {
+    const body = await request<unknown>(
+      `/plugins/${encodeURIComponent(pluginId)}${locale ? `?locale=${encodeURIComponent(locale)}` : ""}`,
+      {},
+      false
+    );
+    const row = body && typeof body === "object" && "plugin" in (body as object)
+      ? (body as { plugin: Record<string, unknown> }).plugin
+      : body as Record<string, unknown>;
+    return mapMarketPlugin(row ?? {});
+  },
+  listCategories: async () => {
+    const body = await request<unknown>("/categories", {}, false);
+    return unwrapItems<Record<string, unknown>>(body).map(mapCategory);
+  },
   getEntitlement: (pluginId: string) => request<{ entitled: boolean; source?: string }>(`/plugins/${encodeURIComponent(pluginId)}/entitlement`),
   redeemPurchase: (pluginId: string, orderNumber: string, overpaymentDestination: string) => request<Record<string, unknown>>(
     "/purchases/redeem", { method: "POST", body: jsonBody({ pluginId, orderNumber, overpaymentDestination }) }),
@@ -211,11 +313,9 @@ export const pluginCenterApi = {
   removePluginIcon: (pluginId: string) => request<{ removed: boolean }>(
     `/publisher/plugins/${pluginId}/icon`, { method: "DELETE" }),
   /**
-   * Upload strategy:
-   * - &lt;12 MiB: multipart FormData through Edge (simple path)
-   * - 12–50 MiB: single signed Storage object
-   * - &gt;50 MiB: split into ≤40 MiB parts (Supabase Free hard-caps each object at 50 MB)
-   *   upload-session → upload each part → finalize (reassemble + light scan)
+   * Upload strategy (Cloudflare Worker / api.pcln.top):
+   * - &lt;12 MiB: multipart FormData through the Worker
+   * - larger: upload-session → PUT upload-part (Worker→R2) → finalize
    */
   uploadVersion: async (input: UploadVersionInput) => {
     const smallFormThreshold = 12 * 1024 * 1024;
@@ -238,6 +338,7 @@ export const pluginCenterApi = {
       multipart?: boolean;
       objectPath: string;
       manifestPath?: string;
+      uploadUri?: string;
       token?: string;
       signedUrl?: string;
       path?: string;
@@ -250,10 +351,11 @@ export const pluginCenterApi = {
       parts?: Array<{
         index: number;
         path: string;
-        token: string;
-        signedUrl: string;
-        uploadPath: string;
         maxSize: number;
+        uploadUri?: string;
+        token?: string;
+        signedUrl?: string;
+        uploadPath?: string;
       }>;
     }>(`/publisher/plugins/${input.pluginId}/versions/upload-session`, {
       method: "POST",
@@ -272,19 +374,13 @@ export const pluginCenterApi = {
         const end = Math.min(start + part.maxSize, input.package.size);
         const slice = input.package.slice(start, end);
         const partSha = await sha256Hex(slice);
-        const { error: uploadError } = await supabase.storage
-          .from("plugin-packages")
-          .uploadToSignedUrl(part.uploadPath || part.path, part.token, slice, {
-            contentType: "application/octet-stream",
-            upsert: false
-          });
-        if (uploadError) {
+        if (!part.uploadUri) {
           throw new PluginCenterApiError(
-            uploadError.message ||
-              `分块上传失败 (part ${part.index}/${session.parts.length - 1})`,
-            400
+            `分块上传缺少 uploadUri (part ${part.index})`,
+            502
           );
         }
+        await uploadBytesToWorker(part.uploadUri, slice, partSha);
         uploadedParts.push({
           index: part.index,
           path: part.path,
@@ -299,35 +395,25 @@ export const pluginCenterApi = {
           method: "POST",
           body: JSON.stringify({
             mode: "multipart",
+            multipart: true,
             version: input.version,
             channel: input.channel,
             manifestPath: session.manifestPath || session.objectPath,
             packageSha256,
+            packageSize: input.package.size,
             parts: uploadedParts,
             releaseNotes: input.releaseNotes,
+            changelog: input.releaseNotes,
             minimumLauncherVersion: input.minimumLauncherVersion
           })
         }
       );
     }
 
-    // Single-object direct upload (&lt;= Free 50 MB object cap)
-    const { error: uploadError } = await supabase.storage
-      .from("plugin-packages")
-      .uploadToSignedUrl(session.path || session.objectPath, session.token!, input.package, {
-        contentType: "application/octet-stream",
-        upsert: false
-      });
-    if (uploadError) {
-      const msg = uploadError.message || "直传 Storage 失败";
-      if (msg.includes("maximum allowed size") || msg.includes("413")) {
-        throw new PluginCenterApiError(
-          "Storage 单文件超过 Free 计划 50 MB 上限。请刷新页面后重试（大包会自动分块上传）。",
-          413
-        );
-      }
-      throw new PluginCenterApiError(msg, 400);
+    if (!session.uploadUri) {
+      throw new PluginCenterApiError("上传会话未返回 uploadUri", 502);
     }
+    await uploadBytesToWorker(session.uploadUri, input.package, packageSha256);
 
     return request<{ version: Record<string, unknown>; scan: Record<string, unknown> }>(
       `/publisher/plugins/${input.pluginId}/versions/finalize`,
@@ -339,7 +425,9 @@ export const pluginCenterApi = {
           channel: input.channel,
           objectPath: session.objectPath,
           packageSha256,
+          packageSize: input.package.size,
           releaseNotes: input.releaseNotes,
+          changelog: input.releaseNotes,
           minimumLauncherVersion: input.minimumLauncherVersion
         })
       }

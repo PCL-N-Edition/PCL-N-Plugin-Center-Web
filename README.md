@@ -6,7 +6,7 @@
 - 认证：`https://auth.pcln.top`（登录 / 协议 / OAuth）
 
 部署：`Cloudflare Pages`（项目名 `pcl-n-web`）  
-生产写入 API：`https://vtvhtscdvfnuttwapzxu.supabase.co/functions/v1/plugin-center-api`
+生产 API：`https://api.pcln.top`（Cloudflare Worker；市场/发布者/下载走原生 D1/R2。登录仍用 Supabase Auth）
 
 PCL.N 插件中心的公开管理端，包含发布者工作台与平台管理工作区。
 
@@ -101,7 +101,7 @@ pnpm build:prod
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_WEB_BASE_API`（生产固定为 `https://api.pcln.top`；版本目录由 Cloudflare R2/D1 提供，其余尚未迁移接口由 Worker 兼容回源）
+- `VITE_WEB_BASE_API`（生产固定为 `https://api.pcln.top`；市场目录与发布者上传走 Worker 原生，Auth 仍经 Supabase）
 
 ### 本地手动发布
 
