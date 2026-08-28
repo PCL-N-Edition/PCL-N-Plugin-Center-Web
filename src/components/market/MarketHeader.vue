@@ -68,9 +68,7 @@ onBeforeUnmount(() => media.removeEventListener("change", applyMarketTheme));
 
 const toggleLanguage = () => {
   const next = locale.value === "zh" ? "en" : "zh";
-  locale.value = next;
-  globalStore.setGlobalState("language", next);
-  document.documentElement.lang = next === "zh" ? "zh-CN" : "en-US";
+  globalStore.setLanguage(next);
 };
 </script>
 

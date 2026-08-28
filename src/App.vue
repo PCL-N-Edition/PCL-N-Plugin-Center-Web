@@ -5,9 +5,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, nextTick, computed } from "vue";
+import { onMounted, nextTick, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { getBrowserLang } from "@/utils/index.ts";
+import { getBrowserLanguage, getDocumentLanguage, normalizeLanguage } from "@/languages/language.ts";
 import { useTheme } from "@/utils/theme.ts";
 import { applyPublicTheme } from "@/utils/publicTheme.ts";
 import en from "element-plus/es/locale/lang/en";
@@ -29,8 +29,6 @@ applyPublicTheme();
 onMounted(() => {
   // 初始化主题配置
   handleThemeConfig();
-  // 初始化语言配置
-  handleI18nConfig();
   // 自动检测更新
   // handleAutoUpdate();
   // 开发环境打印项目名称
@@ -43,17 +41,25 @@ onMounted(() => {
 
 /** 语言配置 */
 const locale = computed(() => {
-  if (globalStore.language == "zh") return zhCn;
-  if (globalStore.language == "en") return en;
-  return getBrowserLang() == "zh" ? zhCn : en;
+  return globalStore.language === "zh" ? zhCn : en;
 });
 
-/** 初始化语言配置 */
-const handleI18nConfig = () => {
-  const language = globalStore.language ?? getBrowserLang();
-  i18n.locale.value = language;
-  globalStore.setGlobalState("language", language);
-};
+// Pinia is the single source of truth. This also repairs stale/invalid values
+// from older persisted store versions before any page renders translated text.
+watch(
+  () => globalStore.language,
+  (value) => {
+    const language = normalizeLanguage(value, getBrowserLanguage());
+    if (value !== language) {
+      globalStore.setLanguage(language);
+      return;
+    }
+
+    i18n.locale.value = language;
+    document.documentElement.lang = getDocumentLanguage(language);
+  },
+  { immediate: true, flush: "sync" }
+);
 
 /** 初始化主题配置 */
 const handleThemeConfig = () => {

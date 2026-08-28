@@ -23,13 +23,11 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
 import useGlobalStore from "@/stores/modules/global.ts";
-import { LanguageType } from "@/stores/interface/index.ts";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const route = useRoute();
-const i18n = useI18n();
 const globalStore = useGlobalStore();
 const language = computed(() => globalStore.language);
 
@@ -57,8 +55,7 @@ watch(
 );
 
 const handleChangeLanguage = (lang: string) => {
-  i18n.locale.value = lang;
-  globalStore.setGlobalState("language", lang as LanguageType);
+  globalStore.setLanguage(lang);
 };
 </script>
 

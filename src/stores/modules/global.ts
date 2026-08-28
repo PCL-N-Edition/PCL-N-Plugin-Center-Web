@@ -1,6 +1,7 @@
 // 定义是否折叠小仓库[选择式Api写法]
 import { defineStore } from "pinia";
 import { CACHE_PREFIX, DEFAULT_THEME } from "@/config/index.ts";
+import { getBrowserLanguage, normalizeLanguage } from "@/languages/language.ts";
 
 // defineStore方法执行会返回一个函数，函数的作用就是让组件可以获取到仓库数据
 const globalStore = defineStore("global", {
@@ -27,8 +28,8 @@ const globalStore = defineStore("global", {
       dimension: "default",
       // 当前页面是否全屏
       maximize: false,
-      // 当前系统语言[默认中文]
-      language: "zh",
+      // 当前系统语言：持久化选择优先，首次访问跟随浏览器
+      language: getBrowserLanguage(),
       // 选择主题[默认兔子坦克形态]
       themeColor: DEFAULT_THEME,
       // 布局模式 (纵向：vertical | 经典：classic | 横向：horizontal | 分栏：column)
@@ -72,6 +73,9 @@ const globalStore = defineStore("global", {
     // 设置ElementPlus尺寸
     setDimension(value: string) {
       this.dimension = value;
+    },
+    setLanguage(value: unknown) {
+      this.language = normalizeLanguage(value, getBrowserLanguage());
     }
   },
   // 计算属性，和vuex是使用一样，getters里面不是方法，是计算返回的结果值

@@ -298,19 +298,7 @@ export const getUrlWithParams = () => {
  * @description 获取浏览器默认语言
  * @returns {String}
  */
-export const getBrowserLang = () => {
-  // 检查是否在浏览器环境中
-  if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
-    const browserLang = navigator.language || (navigator as any).browserLanguage;
-    const lang = browserLang?.toLowerCase() || '';
-    
-    if (["cn", "zh", "zh-cn"].includes(lang)) {
-      return "zh";
-    }
-  }
-  // 默认返回英文或根据需求调整
-  return "en";
-}
+export { getBrowserLanguage as getBrowserLang } from "@/languages/language.ts";
 
 import i18n from '@/languages/index.ts';
 

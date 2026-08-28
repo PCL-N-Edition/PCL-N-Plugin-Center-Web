@@ -4,7 +4,7 @@
   <!-- 与 Pinia global 持久化一致，首屏挂上主题色与 html.dark -->
   <script>
     (function () {
-      var CACHE_KEY = "pcl-plugin-center-vue-global";
+      var CACHE_KEY = "pcl-plugin-center-global";
       var DEFAULT_THEME = "#4F6EF7";
       var DEFAULT_THEME_RGB = "79,110,247";
 
@@ -115,6 +115,12 @@
       try {
         var raw = localStorage.getItem(CACHE_KEY);
         var data = raw ? JSON.parse(raw) : null;
+        var storedLanguage = data && typeof data.language === "string" ? data.language.toLowerCase() : "";
+        var browserLanguage = (navigator.language || "en").toLowerCase();
+        var language = storedLanguage || browserLanguage;
+        document.documentElement.lang = language === "cn" || language === "zh" || language.indexOf("zh-") === 0
+          ? "zh-CN"
+          : "en-US";
         var themeColor = data && typeof data.themeColor === "string" ? data.themeColor.trim() : "";
         var expanded = expandShortHex(themeColor);
         var isValidHex = /^#([0-9A-Fa-f]{6})$/.test(expanded);
