@@ -3,7 +3,7 @@
     <router-link to="/" class="brand" aria-label="PCL N">
       <img class="brand-mark" src="/pcln.png" alt="" />
       <span class="brand-copy">
-        <strong>{{ t("market.header.brand") }}</strong>
+        <strong>{{ isNexaPage ? 'PCL Nexa' : t("market.header.brand") }}</strong>
         <small>PLUGIN PLATFORM</small>
       </span>
     </router-link>
@@ -11,6 +11,7 @@
       <router-link to="/">{{ t("market.header.home") }}</router-link>
       <router-link to="/market">{{ t("market.header.plugins") }}</router-link>
       <router-link to="/download">{{ t("market.header.download") }}</router-link>
+      <router-link v-if="isNexaPage" to="/changelog">{{ locale === 'zh' ? '更新日志' : 'Changelog' }}</router-link>
       <a class="docs-link" href="https://docs.pcln.top/" target="_blank" rel="noreferrer">{{ t("market.header.docs") }}</a>
       <router-link v-if="userStore.token" to="/home">{{ t("market.header.dashboard") }}</router-link>
       <a v-else :href="authHref">{{ t("market.header.signIn") }}</a>
@@ -40,6 +41,7 @@ import {
 } from "@/utils/publicTheme";
 
 const route = useRoute();
+const isNexaPage = computed(() => ['/', '/download', '/changelog'].includes(route.path.replace(/\/$/, '') || '/'));
 const userStore = useUserStore();
 const globalStore = useGlobalStore();
 const { t, locale } = useI18n();

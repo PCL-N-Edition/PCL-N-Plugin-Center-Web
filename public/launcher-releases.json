@@ -1,9 +1,19 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-09T01:28:41.000Z",
+  "generatedAt": "2026-08-29T13:04:11.000Z",
   "source": "cloudflare-r2+d1",
-  "stableTagFromLatest": "v1.3.20-release",
+  "stableTagFromLatest": "v1.4.13",
   "versions": [
+    {
+      "id": "v1.4.13",
+      "label": "1.4.13",
+      "tag": "v1.4.13",
+      "channel": "release",
+      "packaging": "v2",
+      "supportsPluginChoice": false,
+      "publishedAt": "2026-08-29T12:58:10.000Z",
+      "packageAssets": []
+    },
     {
       "id": "v1.3.20-release",
       "label": "1.3.20",
@@ -15,153 +25,73 @@
       "packageAssets": []
     },
     {
-      "id": "v1.4.3-beta",
-      "label": "1.4.3 Beta",
-      "tag": "v1.4.3-beta",
+      "id": "v1.4.12-beta",
+      "label": "1.4.12 Beta",
+      "tag": "v1.4.12-beta",
       "channel": "beta",
       "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-09T00:46:30.000Z",
+      "publishedAt": "2026-08-29T05:37:38.000Z",
       "packageAssets": []
     },
     {
-      "id": "v1.4.2-beta",
-      "label": "1.4.2 Beta",
-      "tag": "v1.4.2-beta",
+      "id": "v1.4.11-beta",
+      "label": "1.4.11 Beta",
+      "tag": "v1.4.11-beta",
       "channel": "beta",
       "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-04T11:57:08.000Z",
+      "publishedAt": "2026-08-25T00:29:59.000Z",
       "packageAssets": []
     },
     {
-      "id": "v1.4.1-beta",
-      "label": "1.4.1 Beta",
-      "tag": "v1.4.1-beta",
+      "id": "v1.4.10-beta",
+      "label": "1.4.10 Beta",
+      "tag": "v1.4.10-beta",
       "channel": "beta",
       "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-04T10:30:00.000Z",
+      "publishedAt": "2026-08-24T09:48:15.000Z",
       "packageAssets": []
     },
     {
-      "id": "v1.4.0-beta",
-      "label": "1.4.0 Beta",
-      "tag": "v1.4.0-beta",
+      "id": "v1.4.9-beta",
+      "label": "1.4.9 Beta",
+      "tag": "v1.4.9-beta",
       "channel": "beta",
       "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-04T05:53:27.000Z",
+      "publishedAt": "2026-08-24T06:48:41.000Z",
       "packageAssets": []
     },
     {
-      "id": "v1.3.20-beta",
-      "label": "1.3.20 Beta",
-      "tag": "v1.3.20-beta",
+      "id": "v1.4.8-beta",
+      "label": "1.4.8 Beta",
+      "tag": "v1.4.8-beta",
       "channel": "beta",
       "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-03T14:44:24.000Z",
+      "publishedAt": "2026-08-24T03:15:15.000Z",
       "packageAssets": []
     },
     {
-      "id": "v1.3.19-beta",
-      "label": "1.3.19 Beta",
-      "tag": "v1.3.19-beta",
+      "id": "v1.4.7-beta",
+      "label": "1.4.7 Beta",
+      "tag": "v1.4.7-beta",
       "channel": "beta",
-      "packaging": "legacy",
+      "packaging": "v2",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-02T23:53:02.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.18-beta",
-      "label": "1.3.18 Beta",
-      "tag": "v1.3.18-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-08-02T21:54:55.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.17-beta",
-      "label": "1.3.17 Beta",
-      "tag": "v1.3.17-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-08-02T12:13:50.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.16-beta",
-      "label": "1.3.16 Beta",
-      "tag": "v1.3.16-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T14:28:51.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.15-beta",
-      "label": "1.3.15 Beta",
-      "tag": "v1.3.15-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T13:05:31.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.14-beta",
-      "label": "1.3.14 Beta",
-      "tag": "v1.3.14-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T08:23:17.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.13-beta",
-      "label": "1.3.13 Beta",
-      "tag": "v1.3.13-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T06:53:05.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.12-beta",
-      "label": "1.3.12 Beta",
-      "tag": "v1.3.12-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T05:35:18.000Z",
-      "packageAssets": []
-    },
-    {
-      "id": "v1.3.11-beta",
-      "label": "1.3.11 Beta",
-      "tag": "v1.3.11-beta",
-      "channel": "beta",
-      "packaging": "legacy",
-      "supportsPluginChoice": false,
-      "publishedAt": "2026-07-29T04:07:37.000Z",
+      "publishedAt": "2026-08-19T05:11:31.000Z",
       "packageAssets": []
     },
     {
       "id": "ci-latest",
-      "label": "CI e33ce4d",
+      "label": "CI 4ce2f71",
       "tag": "ci-latest",
       "channel": "ci",
       "packaging": "legacy",
       "supportsPluginChoice": false,
-      "publishedAt": "2026-08-09T01:28:41.000Z",
+      "publishedAt": "2026-08-29T05:45:28.000Z",
       "packageAssets": []
     }
   ]

@@ -39,6 +39,7 @@ export function isPublicRoutePath(path: string): boolean {
   if (
     normalized === "/" ||
     normalized === "/download" ||
+    normalized === "/changelog" ||
     normalized.startsWith("/download/") ||
     normalized === "/market" ||
     normalized.startsWith("/market/") ||

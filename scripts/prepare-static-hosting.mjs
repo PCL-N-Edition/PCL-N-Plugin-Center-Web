@@ -31,6 +31,8 @@ if (!roots.length) {
 const publicRoutes = [
   "login",
   "download",
+  "download/legacy",
+  "changelog",
   "download/thanks",
   "market",
   "account",

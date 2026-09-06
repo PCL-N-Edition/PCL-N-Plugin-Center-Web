@@ -7,13 +7,25 @@ export const layoutRouter: RouteRecordRaw[] = [
     path: "/",
     name: "publicLanding",
     component: () => import("@/views/site/index.vue"),
-    meta: { title: "PCL N" }
+    meta: { title: "PCL Nexa 2.0.0 Alpha" }
   },
   {
     path: "/download",
     name: "publicDownload",
     component: () => import("@/views/site/download.vue"),
-    meta: { title: "下载 PCL N" }
+    meta: { title: "下载 PCL Nexa" }
+  },
+  {
+    path: "/download/legacy",
+    name: "publicLegacyDownload",
+    component: () => import("@/views/site/download-legacy.vue"),
+    meta: { title: "下载 PCL N 1.x" }
+  },
+  {
+    path: "/changelog",
+    name: "publicChangelog",
+    component: () => import("@/views/site/changelog.vue"),
+    meta: { title: "PCL Nexa 更新日志" }
   },
   {
     path: "/download/thanks",

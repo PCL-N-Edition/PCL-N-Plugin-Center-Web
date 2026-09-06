@@ -10,9 +10,9 @@
   "scripts": {
     "dev": "vite",
     "fetch:releases": "node scripts/fetch-launcher-releases.mjs",
-    "build": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build",
-    "build:test": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode test",
-    "build:prod": "node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode production && node scripts/prepare-static-hosting.mjs",
+    "build": "node scripts/fetch-nexa-releases.mjs && node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build",
+    "build:test": "node scripts/fetch-nexa-releases.mjs && node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode test",
+    "build:prod": "node scripts/fetch-nexa-releases.mjs && node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode production && node scripts/prepare-static-hosting.mjs",
     "build:sites": "pnpm build:prod && node scripts/prepare-sites-build.mjs && node scripts/prepare-static-hosting.mjs",
     "deploy:cf": "pnpm build:prod && wrangler pages deploy dist --project-name=pcl-n-web",
     "type:check": "vue-tsc --noEmit --skipLibCheck",
