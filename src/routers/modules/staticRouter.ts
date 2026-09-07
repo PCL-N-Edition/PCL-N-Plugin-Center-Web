@@ -18,7 +18,7 @@ export const layoutRouter: RouteRecordRaw[] = [
   {
     path: "/download/legacy",
     name: "publicLegacyDownload",
-    component: () => import("@/views/site/download-legacy.vue"),
+    redirect: "/download?product=legacy",
     meta: { title: "下载 PCL N 1.x" }
   },
   {
