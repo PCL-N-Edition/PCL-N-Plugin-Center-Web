@@ -1,3 +1,4 @@
+import { loadGithubReleases } from "./githubReleases.ts";
 export const NEXA_GITHUB = "https://github.com/PCL-N-Edition/PCL-N";
 export interface NexaAsset { name: string; browser_download_url: string; size: number }
 export interface NexaRelease { tag_name: string; name: string; body: string; published_at: string; html_url: string; assets: NexaAsset[] }
@@ -13,11 +14,18 @@ export function releaseAssets(release: NexaRelease, platform: string, architectu
     return asset && asset.browser_download_url === `${NEXA_GITHUB}/releases/download/${release.tag_name}/${asset.name}` ? [asset] : [];
   });
 }
-export async function loadNexaReleases(signal?: AbortSignal): Promise<NexaRelease[]> {
-  const response = await fetch(`${import.meta.env.BASE_URL}nexa-releases.json`, { signal });
-  if (!response.ok) throw new Error("Release catalog unavailable");
-  const data = await response.json();
-  if (!Array.isArray(data.releases)) throw new Error("Invalid release catalog");
-  return data.releases.filter((r: NexaRelease) => nexaChannel(r.tag_name) !== null && Array.isArray(r.assets)
-    && r.html_url === `${NEXA_GITHUB}/releases/tag/${r.tag_name}`);
+export async function loadNexaCatalog(signal?: AbortSignal): Promise<{ releases: NexaRelease[]; source: "github" | "snapshot" }> {
+  try {
+    const releases = (await loadGithubReleases(signal)).filter(r => nexaChannel(r.tag_name) !== null);
+    return { releases, source: "github" };
+  } catch (error) {
+    signal?.throwIfAborted();
+    const response = await fetch(`${import.meta.env?.BASE_URL || "/"}nexa-releases.json`, { signal, cache: "no-store" });
+    if (!response.ok) throw error;
+    const data = await response.json();
+    if (!Array.isArray(data.releases)) throw new Error("Invalid release catalog");
+    return { source: "snapshot", releases: data.releases.filter((r: NexaRelease) => nexaChannel(r.tag_name) !== null && Array.isArray(r.assets)
+      && r.html_url === `${NEXA_GITHUB}/releases/tag/${r.tag_name}`) };
+  }
 }
+export async function loadNexaReleases(signal?: AbortSignal): Promise<NexaRelease[]> { return (await loadNexaCatalog(signal)).releases; }

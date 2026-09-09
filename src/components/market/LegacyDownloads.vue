@@ -24,6 +24,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { watchReleaseUpdates } from "@/utils/githubReleases";
 import { useRouter } from "vue-router";
 
 
@@ -283,27 +284,31 @@ watch(selectedChannel, ch => {
 });
 
 let abort: AbortController | null = null;
+let stopUpdates: (() => void) | undefined;
+let refreshing = false;
 
-onMounted(async () => {
-  openDownload(recommendedPlatformId.value || "windows");
-  catalogLoading.value = true;
-  catalogStatus.value = t("site.download.catalogLoading");
+async function refreshCatalog() {
+  if (refreshing) return; refreshing = true;
+  const previous = selectedVersionId.value;
+  if (!abort) { catalogLoading.value = true; catalogStatus.value = t("site.download.catalogLoading"); }
   abort = new AbortController();
   try {
     const result = await fetchLauncherVersionsWithSource({ signal: abort.signal });
+    if (abort.signal.aborted || result.source === "fallback" && previous) return;
     const remote = result.versions.filter(version => /^v?1\./i.test(version.tag) || version.tag === 'ci-latest');
     if (remote.length) {
       versions.value = remote;
       // Prefer beta latest (active channel); else first available.
       const prefer: ReleaseChannel[] = ["beta", "release", "ci"];
       const first = prefer.map(ch => latestForChannel(remote, ch)).find(Boolean);
-      if (first) {
+      if (previous && remote.some(v => v.id === previous)) { selectedVersionId.value = previous; }
+      else if (first) {
         selectedChannel.value = first.channel;
         selectedVersionId.value = first.id;
       } else {
         selectedVersionId.value = remote[0]?.id ?? "";
       }
-      if (result.source === "cloudflare") {
+      if (result.source === "github" || result.source === "cloudflare") {
         catalogStatus.value = t("site.download.catalogReadyApi", { count: remote.length });
       } else if (result.source === "static") {
         catalogStatus.value = t("site.download.catalogReadyStatic", { count: remote.length });
@@ -317,16 +322,17 @@ onMounted(async () => {
       catalogStatus.value = t("site.download.catalogFallback");
     }
   } catch {
+    if (previous || abort?.signal.aborted) return;
     versions.value = FALLBACK_VERSIONS.map(v => ({ ...v }));
     selectedVersionId.value =
       FALLBACK_VERSIONS.find(v => v.channel === "beta")?.id ?? FALLBACK_VERSIONS[0]?.id ?? "";
     catalogStatus.value = t("site.download.catalogFallback");
   } finally {
-    catalogLoading.value = false;
+    catalogLoading.value = false; refreshing = false;
   }
-});
-
-onUnmounted(() => abort?.abort());
+}
+onMounted(() => { openDownload(recommendedPlatformId.value || "windows"); void refreshCatalog(); stopUpdates = watchReleaseUpdates(() => { void refreshCatalog(); }); });
+onUnmounted(() => { stopUpdates?.(); abort?.abort(); });
 
 </script>
 <style scoped>

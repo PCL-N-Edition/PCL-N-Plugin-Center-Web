@@ -1,6 +1,110 @@
 {
-  "generatedAt": "2026-09-07T02:12:13.366Z",
+  "generatedAt": "2026-09-09T22:33:31.239Z",
   "releases": [
+    {
+      "tag_name": "v2.0.0.alpha.2",
+      "name": "PCL Nexa 2.0.0.alpha.2",
+      "body": "# PCL Nexa 2.0.0.alpha.2 Alpha 预览版\n\n## 下载\n\n每个平台选择**一个**包即可；`portable` 为免安装便携版。\n所有文件的 SHA256 校验值见附件 `SHA256SUMS`。\n\n### Windows\n\n- `PCL-Nexa-2.0.0.alpha.2-win-x64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `PCL-Nexa-2.0.0.alpha.2-win-x64.msi` — Windows MSI 安装包（适合系统级部署）\n- `PCL-Nexa-2.0.0.alpha.2-win-x64.portable.zip` — Windows 便携版（解压即用，免安装）\n- `PCL-Nexa-2.0.0.alpha.2-win-arm64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `PCL-Nexa-2.0.0.alpha.2-win-arm64.msi` — Windows MSI 安装包（适合系统级部署）\n- `PCL-Nexa-2.0.0.alpha.2-win-arm64.portable.zip` — Windows 便携版（解压即用，免安装）\n\n### Linux\n\n- `PCL-Nexa-2.0.0.alpha.2-linux-x64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `PCL-Nexa-2.0.0.alpha.2-linux-x64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `PCL-Nexa-2.0.0.alpha.2-linux-x64.AppImage` — Linux AppImage（免安装单文件）\n- `PCL-Nexa-2.0.0.alpha.2-linux-x64.portable.tar.gz` — Linux 便携版（解压即用）\n- `PCL-Nexa-2.0.0.alpha.2-linux-arm64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `PCL-Nexa-2.0.0.alpha.2-linux-arm64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `PCL-Nexa-2.0.0.alpha.2-linux-arm64.AppImage` — Linux AppImage（免安装单文件）\n- `PCL-Nexa-2.0.0.alpha.2-linux-arm64.portable.tar.gz` — Linux 便携版（解压即用）\n\n### macOS\n\n- `PCL-Nexa-2.0.0.alpha.2-osx-x64.dmg` — macOS 映像（打开后拖入 Applications）\n- `PCL-Nexa-2.0.0.alpha.2-osx-x64.portable.tar.gz` — macOS 便携版（解压即用）\n- `PCL-Nexa-2.0.0.alpha.2-osx-arm64.dmg` — macOS 映像（打开后拖入 Applications）\n- `PCL-Nexa-2.0.0.alpha.2-osx-arm64.portable.tar.gz` — macOS 便携版（解压即用）\n\nSHA256SUMS 列出全部文件的哈希，导入或 `sha256sum -c` 即可校验完整性。\n## 更新内容\n\n- fix(ui): stop restyling staged task cards every frame (`12c92e10`)\n  \n  SetComponent dirties the entity as Structure unconditionally, so the\n  per-frame Style calls in UpdateCard kept the whole tree perpetually\n  dirty while the task page was staged — the window froze the moment an\n  install started and the page opened. Cards now skip the restyle when\n  the entry record is unchanged (null on first reconcile forces the full\n  initial write), and a regression test locks the contract: with no entry\n  change the staged page renders the cached scene, and a real change\n  still produces a new one.\n- fix(install,ui): throttle per-chunk progress floods and drop the vanilla button (`87791152`)\n  \n  Per-chunk download callbacks arrive at line speed: a fast link pushed a\n  publish per 128 KiB chunk, and every publish schedules a full frame —\n  the render thread drowned and the window stopped answering right up to\n  the moment an install failed. Install and launch-completion reports now\n  step by at least 0.2% of the whole job, capping publish volume at ~500\n  per run regardless of link speed. A regression test locks the other\n  freeze class: after a failed install the idle tree must render the\n  cached scene unchanged (reference-equal), so no per-frame dirty writer\n  survives the failure.\n  \n  The 使用原版 Minecraft button is gone — not selecting a loader already\n  means vanilla. The ui.install.loader.vanilla intent stays: the catalog\n  flow and its tests use it as the explicit reset-to-vanilla selection.\n- fix(launch): one progress clock inside file completion (`72273d9a`)\n  \n  With real progress flowing from the completion stage, the coordinator's\n  soft heartbeat kept racing it: the heartbeat climbs to its 65.45%\n  ceiling in ~1.4s while real repair progress crawls from 34% — the card\n  flickered between the two for the whole stage. Stages that publish\n  their own progress now opt out of the heartbeat (complete_files does),\n  and the repair reports per-byte progress with a speed line, so the bar\n  moves continuously through large single files instead of stepping per\n  file.\n- fix(launch): report file completion progress on the 0..1 scale (`8f9c65ca`)\n  \n  The completion stage published raw stage weights (LoginWeight +\n  CompleteFilesWeight × fraction = 15..30) where the progress contract\n  expects a 0..1 fraction — everything past 0.52 clamped to 1.0, so the\n  launching card flashed 100% mid-repair before the coordinator heartbeat\n  (ceiling 65.45%) pulled it back. The same absolute-value mistake made\n  the install card jump to 100% at the 版本信息 boundary and crash back\n  near zero on the first transfer. Both now report fractions, and a\n  recorder locks the band: never past the stage ceiling, never regressing.\n- fix(tasks): finished entries read as fully complete; id reuse replaces the card (`9c926f8e`)\n  \n  Terminal states never carried Progress=1, so a finished card could read\n  50% forever; completion now reads as 100% while canceled keeps the\n  progress it reached. Abandoned registrations release their id — reuse\n  replaces the failed card with a fresh running one under the same id,\n  which the contract test now locks. Also closes the one-file lag in the\n  install progress count.\n  \n  The local dotnet-run wrapper was swallowing suite crashes (summary line\n  with zero PASS lines, exit 0); gates now run the built exe directly.\n- fix(install): count every transferred file and report the closing count (`65a95fc1`)\n  \n  The deduplicated transfer list counts each destination once, but the\n  progress callback fires mid-download, so the card froze one file short\n  (3/4 at completion) — the flake CI caught. A final report closes the\n  file count before the task completes.\n- fix(launch,install): repair missing files before the JVM starts and stop the UI render spin (`59c8eafb`)\n  \n  Three real-device failures traced to one root: the legacy 补全文件 step was\n  never migrated, and half-installed instances were discoverable.\n  \n  - complete_files now verifies every referenced file on disk and repairs\n    the missing ones through the shared download engine (client jar, asset\n    index, asset objects, the whole inheritance chain's libraries). A\n    missing library used to kill the JVM before its window appeared — the\n    opaque 'JVM 在窗口出现前意外退出'.\n  - Installs commit their version documents LAST: discovery lists\n    instances by the version json, so a run that dies mid-transfer leaves\n    an invisible, resumable directory instead of a launchable half-install.\n    A single 403 (bmclapi rate limit, real-network verified at 99%) now\n    gets one delayed retry, and third-party library lists keep the\n    canonical URL as a last-resort source.\n  - Success closes the launching page immediately — the user returns to\n    the library while the game warms up instead of parking on a\n    游戏已启动 card until the session ends.\n  - The task bubble and cards no longer MarkDirty unconditionally at\n    FramePreparing: the perpetual dirty flag kept every scene commit\n    changing, spinning the render loop — startup froze with no frame\n    painted, and backing out during an install froze the same way. All\n    per-frame work is now change-guarded.\n  - External cancellation of an install returns a Cancelled result\n    instead of letting the raw exception escape the route.\n- fix(tests): restore the install pipeline assertions mangled by a message-strip regex (`ec54592b`)\n  \n  The regex that dropped per-call assert messages from the new install\n  tests also ate trailing path arguments out of multi-line Path.Combine\n  calls, so the suite asserted directories instead of the written files\n  (and an earlier stale build let that slip through locally). The paths\n  are restored; each new test now passes with a fresh build.\n- feat(install): run real installs through the task center (`6758e959`)\n  \n  The install start button now dispatches the real pipeline instead of a\n  placeholder warning. MinecraftInstallService resolves the vanilla version\n  JSON from the Mojang manifest (bmclapi failover) and the Fabric-family\n  loader profile, writes both version documents before any transfer so a\n  partial install stays inspectable, plans every file through the shared\n  planners (asset index, client jar, platform-filtered libraries, assets,\n  catalog-resolved addon jars into mods/), and downloads through the shared\n  DownloadService with resume and segmentation. The whole run is one\n  task-center task with file-accurate progress; completion fires Installed\n  and the composition root rescans the active version library.\n  \n  Processor-based loaders (Forge, NeoForge, …) are rejected before touching\n  disk with an explicit not-yet-migrated message — processor execution\n  stays deferred per XSR-604. Metadata and byte transfer are ports, so the\n  pipeline is covered by in-memory fakes without network.\n- feat(ui): task center page reconciles one card per tracked task (`d8c0475f`)\n  \n  The task center is a pushed shell subpage: header aggregates live work\n  (progress, speed, remaining files) with a bulk clear-finished action, the\n  body presents one card per entry — state icon, stage copy, progress fill,\n  file counts, per-step rows, and a trailing action that flips between\n  cancel (running) and dismiss (terminal). Cancel and dismiss resolve the\n  entry through the source entity walk and route through the typed task\n  commands; the empty state names the destination so the page is never a\n  blank well. The bubble yields the bottom-right corner while the page is\n  staged and reclaims it one frame after the shared back affordance pops.\n- feat(ui): bottom-right task bubble fills up with aggregate progress (`3f998c6b`)\n  \n  The legacy extra dock's task bubble returns as a persistent shell-level\n  overlay: a round button in the bottom-right dock inset whose translucent\n  fill rises from the bottom edge with aggregated task progress, hidden\n  while the task page owns the corner, filled at 100% once all tasks are\n  done so completion is acknowledged rather than timed out. XsrUiProgress\n  gains the Bottom fill anchor for the rising fill; runtime-built entities\n  set presentation-only targets through the new SetTarget so the backend\n  catch-up animation still applies. Reconciliation stays on the render\n  thread: workers only publish the wake cell, all tree mutations happen at\n  FramePreparing.\n- feat(tasks): add the task center service contract (`512f0a55`)\n  \n  Foundation-owned background task tracking for installs and downloads,\n  parity with the legacy task manager: entries stay visible until\n  dismissed, stage steps never move backwards when a later phase reuses a\n  generic stage name, cancel routes to the owning task's token, abandoned\n  handles surface as failed instead of reading as running forever. The\n  summary cell aggregates active progress, speed, and remaining files for\n  the bubble and the page header; cancel/dismiss are typed XSR routes.\n- ci(xsr): fix formatting gates and execute trimmed desktop smoke (`8be69b8a`)\n- refactor(install): project service eligibility through sealed XSR contracts (`5f20e12d`)\n- feat(install): expose compatible OptiFabric choices and restore selected rows (`f9a6d5e0`)\n- feat(services): validate OptiFine pairings and resolve OptiFabric dependencies (`4e9c6ed7`)\n- feat(install): virtualize catalogs and unify search with version selection (`c0d2f714`)\n- feat(ui): add draggable segmented tracks and inertial list scrolling (`9347a84d`)\n- feat(services): prefetch install catalogs and merge addon download sources (`3a79ba52`)\n- fix(windows): report property store failures outside native callbacks (`7d942efc`)\n- fix(install): keep base loader catalog reachable after selection (`d146ff86`)\n- fix(ui): align install selection with home surfaces and tighten edition cards (`6731cacf`)\n- fix(ui): match compact game download layout with underlined tabs (`ca5fafff`)\n- feat(ui): clarify game download navigation and installation actions (`488b9f4b`)\n- feat(desktop): add embedded installation catalog (`041e0a9a`)\n- feat(ui-next): add horizontal pager control (`d4891e9b`)\n- fix(xsr): make window integration AOT-safe and unify scroll viewports (`6b4c7bd4`)\n- fix(desktop): discard stale pointer focus and start without a console (`e012a143`)\n\n**完整变更**：`v2.0.0.alpha.1` → `2.0.0.alpha.2`\n",
+      "published_at": "2026-09-07T14:19:19Z",
+      "html_url": "https://github.com/PCL-N-Edition/PCL-N/releases/tag/v2.0.0.alpha.2",
+      "assets": [
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-arm64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-arm64.AppImage",
+          "size": 29809160
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-arm64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-arm64.deb",
+          "size": 30858448
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-arm64.portable.tar.gz",
+          "size": 30784253
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-arm64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-arm64.rpm",
+          "size": 30807911
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-x64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-x64.AppImage",
+          "size": 31173112
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-x64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-x64.deb",
+          "size": 32170936
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-x64.portable.tar.gz",
+          "size": 32103368
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-linux-x64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-linux-x64.rpm",
+          "size": 32123896
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-osx-arm64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-osx-arm64.dmg",
+          "size": 32709576
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-osx-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-osx-arm64.portable.tar.gz",
+          "size": 27705580
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-osx-x64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-osx-x64.dmg",
+          "size": 34731736
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-osx-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-osx-x64.portable.tar.gz",
+          "size": 29532813
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-arm64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-arm64.msi",
+          "size": 46522368
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-arm64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-arm64.portable.zip",
+          "size": 59513229
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-arm64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-arm64.setup.exe",
+          "size": 39665799
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-x64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-x64.msi",
+          "size": 48029696
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-x64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-x64.portable.zip",
+          "size": 61111586
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.2-win-x64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/PCL-Nexa-2.0.0.alpha.2-win-x64.setup.exe",
+          "size": 41015862
+        },
+        {
+          "name": "SHA256SUMS",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.2/SHA256SUMS",
+          "size": 1940
+        }
+      ]
+    },
     {
       "tag_name": "v2.0.0.alpha.1",
       "name": "PCL Nexa 2.0.0.alpha.1",

@@ -1,11 +1,13 @@
+import { loadGithubReleases } from "./githubReleases.ts";
 /**
  * Web version discovery:
  *
- *   1) Cloudflare Worker GET /v1/launcher/releases  (R2/D1 catalog)
- *   2) Same-origin public/launcher-releases.json     (build-time snapshot)
- *   3) Baked FALLBACK_VERSIONS
+ *   1) GitHub public Releases API
+ *   2) Cloudflare Worker GET /v1/launcher/releases  (R2/D1 catalog)
+ *   3) Same-origin public/launcher-releases.json     (build-time snapshot)
+ *   4) Baked FALLBACK_VERSIONS
  *
- * Version discovery never depends on Supabase or a browser-to-GitHub request.
+ * Version discovery uses live GitHub data, with Cloudflare and static fallbacks.
  * Release workflows publish the catalog to Cloudflare after assets are ready.
  */
 
@@ -497,7 +499,7 @@ export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
   };
 }
 
-export type LauncherVersionsSource = "cloudflare" | "static" | "fallback";
+export type LauncherVersionsSource = "github" | "cloudflare" | "static" | "fallback";
 
 export interface LauncherVersionsResult {
   versions: ReleaseVersion[];
@@ -562,7 +564,18 @@ export async function fetchLauncherVersionsWithSource(
 ): Promise<LauncherVersionsResult> {
   const { signal } = options;
 
-  // 1) Cloudflare-owned catalog (primary).
+  // GitHub is the live source; both product families share one bounded request cache.
+  try {
+    const releases = await loadGithubReleases(signal);
+    const versions = releases.filter(r => /^v?1\./i.test(r.tag_name) || r.tag_name === CI_ROLLING_TAG)
+      .map(r => normalizeReleaseVersion({ id: r.tag_name, tag: r.tag_name, label: r.tag_name,
+        channel: detectChannel(r.tag_name), packaging: detectPackaging(r.tag_name), supportsPluginChoice: supportsPluginChoice(r.tag_name),
+        publishedAt: r.published_at, packageAssets: r.assets.filter(a => typeof a.name === "string"
+          && a.browser_download_url === `${GH}/${DEFAULT_OWNER}/${DEFAULT_REPO}/releases/download/${r.tag_name}/${a.name}`) }));
+    if (versions.length) return { versions: sortVersions(versions), source: "github", generatedAt: new Date().toISOString() };
+  } catch { signal?.throwIfAborted(); }
+
+  // Cloudflare catalog remains available if GitHub cannot be reached.
   try {
     const remote = await fetchLauncherVersionsFromApi({ signal });
     return {
@@ -571,6 +584,7 @@ export async function fetchLauncherVersionsWithSource(
       generatedAt: remote.generatedAt
     };
   } catch (err) {
+    signal?.throwIfAborted();
     console.warn("[download] Cloudflare launcher releases API failed:", err);
   }
 
@@ -602,6 +616,7 @@ export async function fetchLauncherVersionsWithSource(
       }
     }
   } catch (err) {
+    signal?.throwIfAborted();
     console.warn("[download] Local launcher-releases.json unavailable:", err);
   }
 

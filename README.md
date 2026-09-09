@@ -143,3 +143,14 @@ pnpm build:prod
 ```
 
 私有 API 与扫描 Worker 位于 `MuXue1230-owo/PCL-N-Plugin-Center-Server`。
+
+### Release information refresh
+
+Download and changelog pages read GitHub Releases at runtime. Nexa and 1.x share an in-flight
+request and a 60-second cache. Visible pages revalidate every minute, when returning to the page,
+and when the network reconnects. Background refresh preserves the selected historical version and
+the last displayed data during outages. The committed release JSON files are offline fallbacks;
+Nexa pages identify fallback data explicitly. No GitHub token is exposed to the browser.
+
+Run `node --test scripts/nexa-releases.test.mjs` to verify release filtering, live refresh,
+request coalescing, fallback and cancellation.

@@ -17,6 +17,7 @@
         <div v-else-if="!assets.length" class="download-state" role="status">{{ en ? 'No package is available for this selection. Check GitHub for the latest release.' : '此选项暂无可用安装包，请在 GitHub 查看最新发布。' }}</div>
         <div v-else class="package-list"><article v-for="(asset,index) in assets" :key="asset.name"><div class="package-icon" aria-hidden="true">{{ asset.name.includes('portable') ? '▣' : '↓' }}</div><div class="package-info"><h2>{{ packageLabel(asset.name) }} <span v-if="index === 0" class="package-recommend">{{ en ? 'Recommended' : '推荐' }}</span></h2><p>{{ packageDescription(asset.name) }}</p><small>{{ (asset.size / 1024 / 1024).toFixed(1) }} MB · {{ architecture === 'arm64' ? 'ARM64' : 'x64' }}</small></div><a class="package-download" :class="{ pill: index === 0 }" :href="asset.browser_download_url" :aria-label="`${en ? 'Download' : '下载'} ${packageLabel(asset.name)} ${architecture}`">{{ en ? 'Download' : '下载' }} <span aria-hidden="true">↓</span></a></article></div>
       </div>
+      <p v-if="snapshot" class="alpha-advice" role="status">{{ en ? 'GitHub is currently unavailable. Showing the saved release catalog.' : '暂时无法连接 GitHub，当前显示已保存的发布信息。' }}</p>
       <div class="download-meta"><a :href="selectedRelease?.html_url || NEXA_GITHUB + '/releases'" target="_blank" rel="noreferrer">{{ en ? 'Download on GitHub' : '在 GitHub 直接下载' }} ↗</a><a v-if="checksums" :href="checksums.browser_download_url">{{ en ? 'SHA256 checksums' : 'SHA256 校验文件' }} ↓</a><span>{{ en ? 'No sign-in required' : '无需登录' }}</span></div>
     </section>
     </div>
@@ -30,7 +31,8 @@ import ProductSwitch from '@/components/market/ProductSwitch.vue';
 import LegacyDownloads from '@/components/market/LegacyDownloads.vue';
 import { useI18n } from 'vue-i18n';
 import NexaLayout from '@/components/market/NexaLayout.vue';
-import { NEXA_GITHUB, loadNexaReleases, releaseAssets, type NexaRelease } from '@/utils/nexaReleases';
+import { NEXA_GITHUB, loadNexaCatalog, releaseAssets, type NexaRelease } from '@/utils/nexaReleases';
+import { watchReleaseUpdates } from '@/utils/githubReleases';
 import { applyPageSeo } from '@/utils/seo';
 const { locale } = useI18n(); const en = computed(() => locale.value !== 'zh');
 const route = useRoute(); const router = useRouter();
@@ -39,6 +41,9 @@ const platforms = [{id:'win',name:'Windows',icon:'⊞'},{id:'osx',name:'macOS',i
 const platform = ref('win'); const architecture = ref('x64');
 const releases = ref<NexaRelease[]>([]); const releaseTag = ref(''); const loading = ref(true); const failed = ref(false);
 let controller: AbortController | undefined;
+let stopUpdates: (() => void) | undefined;
+let refreshing = false;
+const snapshot = ref(false);
 const selectedRelease = computed(() => releases.value.find(r=>r.tag_name===releaseTag.value));
 const assets = computed(() => selectedRelease.value ? releaseAssets(selectedRelease.value,platform.value,architecture.value) : []);
 const checksums = computed(() => selectedRelease.value?.assets.find(a=>a.name==='SHA256SUMS' && a.browser_download_url.startsWith(NEXA_GITHUB+'/releases/download/')));
@@ -46,9 +51,21 @@ function setPlatform(value: string) { platform.value=value; architecture.value=v
 function platformKey(event: KeyboardEvent,index: number) { let next=index; if(event.key==='ArrowRight') next=(index+1)%3; else if(event.key==='ArrowLeft') next=(index+2)%3; else if(event.key==='Home') next=0; else if(event.key==='End') next=2; else return; event.preventDefault(); setPlatform(platforms[next].id); document.getElementById(`platform-${platforms[next].id}`)?.focus(); }
 function packageLabel(name: string) { if(name.includes('.portable.')) return en.value?'Portable archive':'便携包'; if(name.endsWith('.setup.exe')) return en.value?'Windows installer':'Windows 安装包'; if(name.endsWith('.msi')) return en.value?'MSI installer':'MSI 安装包'; if(name.endsWith('.dmg')) return en.value?'macOS installer':'macOS 安装包'; if(name.endsWith('.deb')) return 'DEB · Debian / Ubuntu'; if(name.endsWith('.rpm')) return 'RPM · Fedora / openSUSE'; return 'AppImage'; }
 function packageDescription(name: string) { if(name.includes('.portable.')) return en.value?'Extract and open. No installation needed.':'解压后打开，无需安装。'; if(name.endsWith('.setup.exe')) return en.value?'Guided setup, with an optional desktop shortcut.':'引导式安装，可选创建桌面快捷方式。'; if(name.endsWith('.dmg')) return en.value?'Open the disk image and drag Nexa to Applications.':'打开镜像，将 Nexa 拖入“应用程序”。'; if(name.endsWith('.AppImage')) return en.value?'Allow execution, then open directly.':'赋予执行权限后直接运行。'; return en.value?'Install using your system package manager.':'通过系统安装程序完成安装。'; }
-async function refresh() { controller?.abort(); controller=new AbortController(); loading.value=true; failed.value=false; try { releases.value=await loadNexaReleases(controller.signal); releaseTag.value=releases.value.find(r=>r.tag_name.includes('.alpha.'))?.tag_name || releases.value[0]?.tag_name || ''; } catch { failed.value=true; } finally { loading.value=false; } }
-onMounted(()=>{ if(/Mac/i.test(navigator.platform)) setPlatform('osx'); else if(/Linux/i.test(navigator.platform) && !/Android/i.test(navigator.userAgent)) setPlatform('linux'); void refresh(); });
-onBeforeUnmount(()=>controller?.abort());
+async function refresh() {
+  if (refreshing) return;
+  refreshing = true; const request = new AbortController(); controller = request;
+  if (!releases.value.length) loading.value = true;
+  try {
+    const catalog = await loadNexaCatalog(request.signal);
+    if (request.signal.aborted) return;
+    const wasLatest = !releaseTag.value || releaseTag.value === releases.value[0]?.tag_name;
+    if (catalog.source === "github" || !releases.value.length) releases.value = catalog.releases; snapshot.value = catalog.source === 'snapshot'; failed.value = false;
+    if (wasLatest || !releases.value.some(r => r.tag_name === releaseTag.value)) releaseTag.value = releases.value[0]?.tag_name || '';
+  } catch { if (!request.signal.aborted) failed.value = !releases.value.length; }
+  finally { refreshing = false; if (!request.signal.aborted) loading.value = false; }
+}
+onMounted(()=>{ if(/Mac/i.test(navigator.platform)) setPlatform('osx'); else if(/Linux/i.test(navigator.platform) && !/Android/i.test(navigator.userAgent)) setPlatform('linux'); void refresh(); stopUpdates = watchReleaseUpdates(() => { void refresh(); }); });
+onBeforeUnmount(()=>{ stopUpdates?.(); controller?.abort(); });
 watchEffect(()=>applyPageSeo({title:en.value?'Download PCL Nexa 2.0.0 Alpha':'下载 PCL Nexa 2.0.0 Alpha',description:en.value?'Download Windows, macOS and Linux installers and portable archives directly from GitHub. PCL N 1.x remains available.':'直接从 GitHub 下载 Nexa 的 Windows、macOS、Linux 安装包与便携包。保留 PCL N 1.x 下载。',path:'/download'}));
 </script>
 <style scoped>
