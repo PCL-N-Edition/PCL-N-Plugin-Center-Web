@@ -194,6 +194,21 @@
       "workspace": "admin"
     },
     {
+      "menuId": 208,
+      "menuName": "menu.admin.telemetry",
+      "parentId": 200,
+      "menuType": "2",
+      "path": "/admin/telemetry",
+      "name": "adminTelemetry",
+      "component": "admin/telemetry/index",
+      "icon": "koi-menu-board",
+      "isVisible": "1",
+      "isKeepAlive": "1",
+      "isTag": "0",
+      "isAffix": "0",
+      "workspace": "admin"
+    },
+    {
       "menuId": 207,
       "menuName": "menu.admin.announcements",
       "parentId": 200,

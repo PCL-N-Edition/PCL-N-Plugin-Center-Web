@@ -1,6 +1,214 @@
 {
-  "generatedAt": "2026-09-09T22:33:31.239Z",
+  "generatedAt": "2026-09-24T23:53:47.374Z",
   "releases": [
+    {
+      "tag_name": "v2.0.0.alpha.4",
+      "name": "Nexa 2.0.0.alpha.4",
+      "body": "# Nexa 2.0.0.alpha.4 Alpha 预览版\n\n## 下载\n\n每个平台选择**一个**包即可；`portable` 为免安装便携版。\n所有文件的 SHA256 校验值见附件 `SHA256SUMS`。\n\n### Windows\n\n- `Nexa-2.0.0.alpha.4-win-x64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `Nexa-2.0.0.alpha.4-win-x64.msi` — Windows MSI 安装包（适合系统级部署）\n- `Nexa-2.0.0.alpha.4-win-x64.portable.zip` — Windows 便携版（解压即用，免安装）\n- `Nexa-2.0.0.alpha.4-win-arm64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `Nexa-2.0.0.alpha.4-win-arm64.msi` — Windows MSI 安装包（适合系统级部署）\n- `Nexa-2.0.0.alpha.4-win-arm64.portable.zip` — Windows 便携版（解压即用，免安装）\n\n### Linux\n\n- `Nexa-2.0.0.alpha.4-linux-x64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `Nexa-2.0.0.alpha.4-linux-x64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `Nexa-2.0.0.alpha.4-linux-x64.AppImage` — Linux AppImage（免安装单文件）\n- `Nexa-2.0.0.alpha.4-linux-x64.portable.tar.gz` — Linux 便携版（解压即用）\n- `Nexa-2.0.0.alpha.4-linux-arm64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `Nexa-2.0.0.alpha.4-linux-arm64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `Nexa-2.0.0.alpha.4-linux-arm64.AppImage` — Linux AppImage（免安装单文件）\n- `Nexa-2.0.0.alpha.4-linux-arm64.portable.tar.gz` — Linux 便携版（解压即用）\n\n### macOS\n\n- `Nexa-2.0.0.alpha.4-osx-x64.dmg` — macOS 映像（打开后拖入 Applications）\n- `Nexa-2.0.0.alpha.4-osx-x64.portable.tar.gz` — macOS 便携版（解压即用）\n- `Nexa-2.0.0.alpha.4-osx-arm64.dmg` — macOS 映像（打开后拖入 Applications）\n- `Nexa-2.0.0.alpha.4-osx-arm64.portable.tar.gz` — macOS 便携版（解压即用）\n\nSHA256SUMS 列出全部文件的哈希，导入或 `sha256sum -c` 即可校验完整性。\n## 更新内容\n\n- test(launch): remove terminal-state timing race (`075dd314`)\n- fix(window): finish circular shell transitions (`eca7c58e`)\n- fix(capabilities): preserve scoped analysis truth (`b29b4b47`)\n- fix(settings): honest loader semantics and a user-facing platform page (`4786e847`)\n  \n  Follow-ups from the second device pass:\n  \n  - LOADER_INCOMPATIBLE fired on healthy installs: a resolved version\n    chain is complete BY CONSTRUCTION (the reader throws on a missing\n    parent) and self-contained loader jsons legitimately carry no\n    inheritsFrom. chainComplete is no longer inferred from the parent\n    count, and loader.minecraft.compatible only reports false from an\n    explicit range check (future slice) — never silently.\n  - Internal names are gone from the page: the evidence line shows the\n    data source or the reason, never capability ids or provider ids, and\n    every issue code the engine emits has a Chinese label with a generic\n    fallback instead of the raw MEM_/GAME_ string.\n  - The 修复板块 no longer lists registry placeholders: definitions with\n    no wired provider (尚未接入检测提供方) and Action/Policy-kind\n    definitions are filtered out, and rows are deduped by id defensively.\n  - preflight.* / remediation.* / policy.* namespaces stay in the frozen\n    registry (their providers exist) but stop flooding the page.\n- fix(settings,capabilities): repair the platform page and its probe feeds (`e4978d19`)\n  \n  All eight real-device reports on the 平台功能 board:\n  \n  - Java 超时: each runtime cost one java -version process; the broker's\n    3s window timed the whole java namespace out. The locator now caches\n    its scan process-wide (10 min) and the broker window widens to 45s\n    for first refresh — the probe round-trip drops from timeout to 1.2s.\n  - 加载器版本 unknown: manifests often omit it; the version now falls\n    back to the loader jar in mods/ (the same source the edit page reads).\n  - 资源包 raw brackets: options.txt resourcePacks renders as a friendly\n    count+names, and the settings row grows one child line per pack\n    instead of bracketed JSON.\n  - 陀螺仪/振动 rows list the connected controllers by name with an\n    explicit per-device-channel-not-wired status instead of a bare 未知.\n  - The value badge is now a gray pill, right-aligned, text centered, for\n    values and unavailability alike; long reasons keep only their leading\n    clause in the badge with the full text on the evidence line; enum-ish\n    English values localize to Chinese.\n  - Section order is a complete table (20 groups) with unknown groups\n    appended instead of piling at position -1.\n  - 修复板块: the preflight card renders the live report (severity,\n    issue rows with Chinese labels) and its bound remediation action per\n    issue, dispatching the typed remediation route.\n  - mod.count finally has a producer: the mods-directory scan feeds the\n    estimator's mod input (it previously read a fact nobody emitted,\n    pinning every estimate at Low confidence).\n  \n  The parallel session's in-flight SettingsRow padding work stays out of\n  this commit (saved to a WIP patch); the desktop suite runs the\n  committed test set at 80 green.\n- feat(jvmhost): complete observation contract (`645147a6`)\n- feat(capabilities): complete planning pipeline (`3690e19f`)\n- fix(architecture): register capability probe executable (`a34652f7`)\n- feat(input): project recent device usage (`c2f99464`)\n- feat(jvmhost): formalize launch observations (`3cc8808d`)\n- feat(capabilities): add scoped planning pipeline (`866d187b`)\n- feat(capabilities): environment projections and the broker derivation pass (`ad54d623`)\n  \n  C1+C2 of the registry gap matrix:\n  \n  - loader.* / account.* / java.requirement+compatibility / minecraft.settings.*\n    answer from the real services: the loader from the manifest chain via\n    MinecraftModLoaderDetector, accounts from the roster (offline sessions\n    verified by definition, online validation honestly deferred to launch),\n    java requirements from the XSR-608 resolver walking to the base\n    manifest's javaVersion, settings from a new options.txt reader scoped\n    to the primary instance's isolated game directory.\n  - One shared primary-instance scope picks the newest instance under the\n    root (10s cache) so every projection answers for the instance the user\n    is about to launch.\n  - The broker gains a derivation pass: cross-provider Derived capabilities\n    compute after collection in registry dependency order — the sanctioned\n    way to combine facts across provider ownership. Default rules cover\n    platform.compatibility (native/emulated execution), memory.derived\n    pressure thresholds, machine.memory classes, and java.derived.missing/\n    hard_incompatible, all degrading to DependencyMissing when inputs drop.\n  \n  Live probe: 76 facts (was 41), all three suites green.\n- fix(window): align corner and reveal masks with the rendered client area (`67c40692`)\n- docs(xsr): index the capability gap matrix in the README (`21348526`)\n- docs(capabilities): gap matrix of Registry 1.1 against the live implementation (`c6b54ae5`)\n  \n  Reads the source registry back against the 41 live facts: per-namespace\n  probe gaps (jvmhost/process/formfactor/input/network/security/mod/\n  resource/world/hook entirely unwired; cpu/memory/gpu/storage/filesystem/\n  display/thermal/java/minecraft partial), the six-layer architecture gaps\n  (no Estimator, no Policy engine, no preflight rules/aggregator/causal\n  graph, no Remediation — only the Blocked⇒Verified invariant and the\n  frozen namespace allowlist exist), and a dependency-driven slice order\n  (C1 environment projections off existing services first, Estimator and\n  Preflight engine mid, jvmhost/observation gated on the Jvm.Host\n  migration).\n- fix(capabilities): cross-platform audit — real probes where they exist, platform-unsupported only where none do (`b401be25`)\n  \n  Every provider branch now answers one of three ways per platform: a\n  real probe, an honest not-yet (with the missing channel named), or\n  platform-unsupported (the concept does not exist there):\n  \n  - macOS memory: sysctl hw.memsize for the total and\n    host_statistics64 free+inactive for availability. The Windows\n    commit budget has no macOS counterpart at all — commit.* reports\n    PlatformUnsupported instead of a zero that preflight would misread.\n  - macOS display: CGGetActiveDisplayList for count and\n    CGDisplayIsBuiltin for the internal panel (the authoritative\n    Apple-silicon answer), alongside the existing main-display facts.\n  - Linux display: without a readable framebuffer (Wayland compositors,\n    headless sessions) there is no portable per-display probe for a\n    non-graphical process — that path now reports PlatformUnsupported\n    instead of a generic not-implemented.\n  - macOS thermal/power split from the Linux branches: hwmon and\n    power_supply/cpufreq never applied to macOS; those platforms name\n    their missing channels (AppleSMC, IOKit) rather than failing\n    silently. GPU reasons name NVML/AMD sysfs and Metal.\n  - Non-Windows memory fallback (unknown platforms) is PlatformUnsupported.\n- fix(capabilities): probe the five reported machine-fact defects (`0c126011`)\n  \n  All five real-device reports traced to concrete defects, each fixed\n  against the authoritative Windows SDK headers:\n  \n  - GPU adapters QI-failed everywhere: IID_IDXGIAdapter3 was written from\n    memory as 645967A4-3E82-444F-... — the real idl value is\n    645967A4-1392-4310-A798-8053CE3E93FD. QueryVideoMemoryInfo also sat\n    on the wrong vtable slot (Adapter3's first two methods are the\n    hardware-content-protection pair; the query is slot 14). The budget\n    now reads live (14.94 GiB on the dev VM, stable across 20 rounds).\n  - CPU temperature showed -273°C: CallNtPowerInformation carries no\n    temperature at all, so its policy bytes were being decoded as\n    kelvin. Windows has no driverless temperature channel — the fact now\n    reports Unknown with that reason; Linux keeps hwmon.\n  - Resolution showed a pixel count: the definition is a WxH string now.\n  - Internal-panel detection: DisplayConfigGetDeviceInfo with\n    outputTechnology INTERNAL is the authoritative signal, wired through\n    GetDisplayConfigBufferSizes + QueryDisplayConfig.\n  - Reflink answers by the instance volume's filesystem (ReFS on\n    Windows, APFS on macOS, Btrfs/XFS on Linux; NTFS/ext4 honestly no).\n  \n  Fixing the panel path exposed a hard native crash: DISPLAYCONFIG_PATH_\n  INFO is 80 bytes (sourceInfo + full PATH_TARGET_INFO + flags) — the\n  flat 36-byte layout overflowed QueryDisplayConfig's array and seg-\n  faulted the process nondeterministically. Structures now mirror\n  wingdi.h exactly; the isolated probe (new --gpu/--java/--display/\n  --parallel modes) and five consecutive full runs are crash-free.\n- feat(capabilities): wire gpu, thermal, and power probes into the registry (`9939969c`)\n  \n  The last placeholder namespaces answer real OS probes now. The broker's\n  ownership rule (a provider may only emit definitions it declares) shaped\n  the split: gpu/thermal/power are separate providers even where one OS\n  call could feed several, because a shared batch silently degraded every\n  cross-owned fact to 'provider not wired'.\n  \n  GPU memory walks CreateDXGIFactory1 -> EnumAdapters -> IDXGIAdapter3::\n  QueryVideoMemoryInfo with available = budget - currentUsage. Virtual\n  machines whose display driver predates Adapter3 answer Unknown with the\n  HRESULT — the Registry forbids substituting static marketing VRAM, and\n  the probe run on the dev VM confirmed exactly that honest path.\n  \n  Power absorbs the battery/AC facts (GetSystemPowerStatus on Windows,\n  /sys/class/power_supply on Linux) plus the active scheme\n  (PowerGetActiveScheme / cpufreq governor); thermal reads\n  CallNtPowerInformation and hwmon, publishing sentinels as Unknown. The\n  duplicate power provider from the environment slice is gone — its id\n  collided and its facts moved into the hardware provider that owns them.\n- feat(capabilities): one probe pass for every registry namespace (`c3365099`)\n  \n  The live probe exposed an ownership rule the broker enforces and the\n  composition violated: a provider may only emit facts it declares, so\n  the multi-namespace mega-providers silently degraded every fact they\n  touched to TemporarilyUnavailable. Providers are now split exactly on\n  ownership lines — display (Win32/CoreGraphics/sysfs), storage\n  (instance path + volume free space), filesystem (platform semantics),\n  power (Win32 status / Linux power_supply; macOS stays NotImplemented),\n  java (the production locator — 9 runtimes found on the dev machine),\n  and minecraft.files (the shared verifier over each discovered\n  instance's client jar, the exact file whose absence used to kill the\n  JVM before its window appeared).\n  \n  Foundation Compose threads the Minecraft root into the instance-scoped\n  providers; the root did not reach the ctor before, which is why the\n  first probe run reported nothing for the path namespaces. The probe\n  tool ships as a registered diagnostic project so ownership or plan\n  regressions surface locally in one command.\n- fix(backend): compile against the Avalonia 12.1 API surface (`a21dcb90`)\n  \n  PointToScreen moved to Avalonia.VisualExtensions (needs the Avalonia\n  using), and Visual.RenderScalingProperty no longer exists publicly —\n  the chrome-update path re-reads TopLevel.RenderScaling at call time,\n  so subscribing to Bounds covers the DPI-change reflow.\n- feat(capabilities): wire the deferred machine and environment probe paths (`8762373e`)\n  \n  The first capability slice left display/storage/filesystem/power and the\n  Minecraft environment namespaces as placeholders. All now answer real\n  probes through the same broker:\n  \n  - display: Windows EnumDisplayMonitors + GetMonitorInfo + VREFRESH,\n    CoreGraphics main display, Linux sysfs framebuffer; internal-panel\n    detection stays explicitly unavailable rather than guessed.\n  - storage/filesystem: instance-volume free space and path writability\n    scope to the active Minecraft root; case sensitivity and symlink\n    support come from platform semantics; reflink stays unavailable until\n    per-filesystem interop lands (a wrong yes silently duplicates data).\n  - power: Windows GetSystemPowerStatus, Linux /sys/class/power_supply;\n    macOS stays NotImplemented pending IOPS interop.\n  - java.*: the production LocalJavaRuntimeLocator is the probe — the\n    capability answers with the same runtimes the launch path selects.\n  - minecraft.files.*: required/missing counts via the shared\n    MinecraftFileVerifier; without a resolved plan the facts report\n    unavailable instead of invented numbers.\n  \n  Duplicate placeholder definitions (power.profile.current,\n  filesystem.reflink) moved out of the base catalog into the real\n  providers. Foundation Compose threads the Minecraft root so\n  instance-scoped facts answer for the path the launcher actually uses.\n- feat(platform): add typed machine capability registry and settings projection (`88e5aa7e`)\n- fix(ui): restore rounded reveal and use draggable settings segments (`fe124617`)\n- fix(window): preserve native chrome without startup crashes or white gutters (`54af5bfa`)\n- perf(ui): reuse scene collection buffers during dirty renders (`e06a8342`)\n- refactor: rename product projects and assemblies to Nexa (`35905b1d`)\n- feat(settings): use segmented pages and remove cloud settings (`84f1beb5`)\n- feat(desktop): add compact settings pages backed by sealed service routes (`5597b806`)\n- feat(settings): resolve layered policies and persist atomic edits (`894034cc`)\n- feat(settings): declare stable IA catalog and policy value contracts (`33874160`)\n\n**完整变更**：`v2.0.0.alpha.3` → `2.0.0.alpha.4`\n",
+      "published_at": "2026-09-19T23:17:36Z",
+      "html_url": "https://github.com/PCL-N-Edition/PCL-N/releases/tag/v2.0.0.alpha.4",
+      "assets": [
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-arm64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-arm64.AppImage",
+          "size": 31476232
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-arm64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-arm64.deb",
+          "size": 32554882
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-arm64.portable.tar.gz",
+          "size": 32482594
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-arm64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-arm64.rpm",
+          "size": 32504875
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-x64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-x64.AppImage",
+          "size": 32860664
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-x64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-x64.deb",
+          "size": 33912904
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-x64.portable.tar.gz",
+          "size": 33852797
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-linux-x64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-linux-x64.rpm",
+          "size": 33876293
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-osx-arm64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-osx-arm64.dmg",
+          "size": 34113576
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-osx-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-osx-arm64.portable.tar.gz",
+          "size": 29100101
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-osx-x64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-osx-x64.dmg",
+          "size": 36198069
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-osx-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-osx-x64.portable.tar.gz",
+          "size": 31019280
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-arm64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-arm64.msi",
+          "size": 48197632
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-arm64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-arm64.portable.zip",
+          "size": 61655221
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-arm64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-arm64.setup.exe",
+          "size": 40997691
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-x64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-x64.msi",
+          "size": 49725440
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-x64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-x64.portable.zip",
+          "size": 63298960
+        },
+        {
+          "name": "Nexa-2.0.0.alpha.4-win-x64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/Nexa-2.0.0.alpha.4-win-x64.setup.exe",
+          "size": 42373390
+        },
+        {
+          "name": "SHA256SUMS",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.4/SHA256SUMS",
+          "size": 1868
+        }
+      ]
+    },
+    {
+      "tag_name": "v2.0.0.alpha.3",
+      "name": "PCL Nexa 2.0.0.alpha.3",
+      "body": "# PCL Nexa 2.0.0.alpha.3 Alpha 预览版\n\n## 下载\n\n每个平台选择**一个**包即可；`portable` 为免安装便携版。\n所有文件的 SHA256 校验值见附件 `SHA256SUMS`。\n\n### Windows\n\n- `PCL-Nexa-2.0.0.alpha.3-win-x64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `PCL-Nexa-2.0.0.alpha.3-win-x64.msi` — Windows MSI 安装包（适合系统级部署）\n- `PCL-Nexa-2.0.0.alpha.3-win-x64.portable.zip` — Windows 便携版（解压即用，免安装）\n- `PCL-Nexa-2.0.0.alpha.3-win-arm64.setup.exe` — Windows 安装包（Inno Setup 向导，可选创建桌面快捷方式）\n- `PCL-Nexa-2.0.0.alpha.3-win-arm64.msi` — Windows MSI 安装包（适合系统级部署）\n- `PCL-Nexa-2.0.0.alpha.3-win-arm64.portable.zip` — Windows 便携版（解压即用，免安装）\n\n### Linux\n\n- `PCL-Nexa-2.0.0.alpha.3-linux-x64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `PCL-Nexa-2.0.0.alpha.3-linux-x64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `PCL-Nexa-2.0.0.alpha.3-linux-x64.AppImage` — Linux AppImage（免安装单文件）\n- `PCL-Nexa-2.0.0.alpha.3-linux-x64.portable.tar.gz` — Linux 便携版（解压即用）\n- `PCL-Nexa-2.0.0.alpha.3-linux-arm64.deb` — Linux DEB 安装包（Debian / Ubuntu）\n- `PCL-Nexa-2.0.0.alpha.3-linux-arm64.rpm` — Linux RPM 安装包（Fedora / openSUSE）\n- `PCL-Nexa-2.0.0.alpha.3-linux-arm64.AppImage` — Linux AppImage（免安装单文件）\n- `PCL-Nexa-2.0.0.alpha.3-linux-arm64.portable.tar.gz` — Linux 便携版（解压即用）\n\n### macOS\n\n- `PCL-Nexa-2.0.0.alpha.3-osx-x64.dmg` — macOS 映像（打开后拖入 Applications）\n- `PCL-Nexa-2.0.0.alpha.3-osx-x64.portable.tar.gz` — macOS 便携版（解压即用）\n- `PCL-Nexa-2.0.0.alpha.3-osx-arm64.dmg` — macOS 映像（打开后拖入 Applications）\n- `PCL-Nexa-2.0.0.alpha.3-osx-arm64.portable.tar.gz` — macOS 便携版（解压即用）\n\nSHA256SUMS 列出全部文件的哈希，导入或 `sha256sum -c` 即可校验完整性。\n## 更新内容\n\n- docs(settings): plan stable IA and layered settings rollout (`ae3dfc4f`)\n- feat(desktop): prefill version editor and show required install action (`b6679c54`)\n- feat(install): plan version edits and preserve existing instance data (`8f4811d6`)\n- feat(install): complete Cleanroom OptiFine LiteLoader and LabyMod pipelines (`0e7d4c9d`)\n- fix(launch): align Forge ignored client jars and legacy native paths (`96d050f9`)\n- feat(install): execute verified Forge and NeoForge installers in isolated roots (`82c7f0f9`)\n- fix(launch): avoid duplicate resolution options rejected by Forge (`f54923fe`)\n- fix(ui): preserve bubble animations and stabilize capsule cursor feedback (`e82c83d7`)\n- fix(desktop): align expanding version actions and animate vertical bubble dock (`c3fd9b56`)\n- test(services): keep Java-choice process alive through window confirmation (`61eba604`)\n- fix(desktop): connect runtime choices and game lifecycle controls (`60825244`)\n- feat(services): supervise game output and resolve Java version choices (`4fdf17b3`)\n- fix(desktop): preserve navigation and refine circular task dock (`68471d0e`)\n- fix(install): retain addon artifacts and distinguish instance identity (`3220fe3e`)\n- feat(desktop): simplify task surfaces and animate initially empty progress (`ce62d4a3`)\n- fix(tasks,install): enforce the review-round capability and integrity contracts (`6280dc05`)\n  \n  Review round P1s on XSR-723/724:\n  \n  - Addon resolution passes the install's game version into the catalog\n    query — the provider game-version filter had no input, so per-game\n    addon catalogs returned the wrong artifact set. The fake catalog\n    records the request and the install test asserts it.\n  - One shared integrity rule, MinecraftFileVerifier: known SHA-1 must\n    match, else known size, else existence-with-content. Install and\n    launch completion use it for reuse decisions AND after every transfer\n    (bad artifact deleted, one retry, then an honest failure) —\n    existence-with-content used to certify corrupted files as successful\n    installs. Assets are hash-verified on launch too; the CheckHash\n    shortcut is gone.\n  - The retention cap bounds every terminal kind, not only successes: all\n    four terminalizations commit through one path that disposes, publishes,\n    and evicts. 31x finished/failed/canceled/abandoned tests lock the cap.\n  - CanCancel is enforced at the service boundary: RequestCancel rejects\n    protected tasks with a distinguishable NotCancelable result, mapped to\n    tasks.task_not_cancelable — never disguised as not-found.\n  \n  Desktop-side card/bubble presentation changes are a parallel session's\n  in-flight work and stay out of this commit.\n\n**完整变更**：`v2.0.0.alpha.2` → `2.0.0.alpha.3`\n",
+      "published_at": "2026-09-12T09:11:44Z",
+      "html_url": "https://github.com/PCL-N-Edition/PCL-N/releases/tag/v2.0.0.alpha.3",
+      "assets": [
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-arm64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-arm64.AppImage",
+          "size": 30198280
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-arm64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-arm64.deb",
+          "size": 31260052
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-arm64.portable.tar.gz",
+          "size": 31182876
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-arm64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-arm64.rpm",
+          "size": 31209769
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-x64.AppImage",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-x64.AppImage",
+          "size": 31554040
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-x64.deb",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-x64.deb",
+          "size": 32595040
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-x64.portable.tar.gz",
+          "size": 32524506
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-linux-x64.rpm",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-linux-x64.rpm",
+          "size": 32553003
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-osx-arm64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-osx-arm64.dmg",
+          "size": 33163110
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-osx-arm64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-osx-arm64.portable.tar.gz",
+          "size": 28065866
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-osx-x64.dmg",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-osx-x64.dmg",
+          "size": 34872300
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-osx-x64.portable.tar.gz",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-osx-x64.portable.tar.gz",
+          "size": 29916661
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-arm64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-arm64.msi",
+          "size": 46874624
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-arm64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-arm64.portable.zip",
+          "size": 59962835
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-arm64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-arm64.setup.exe",
+          "size": 39945713
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-x64.msi",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-x64.msi",
+          "size": 48394240
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-x64.portable.zip",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-x64.portable.zip",
+          "size": 61586560
+        },
+        {
+          "name": "PCL-Nexa-2.0.0.alpha.3-win-x64.setup.exe",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/PCL-Nexa-2.0.0.alpha.3-win-x64.setup.exe",
+          "size": 41329745
+        },
+        {
+          "name": "SHA256SUMS",
+          "browser_download_url": "https://github.com/PCL-N-Edition/PCL-N/releases/download/v2.0.0.alpha.3/SHA256SUMS",
+          "size": 1940
+        }
+      ]
+    },
     {
       "tag_name": "v2.0.0.alpha.2",
       "name": "PCL Nexa 2.0.0.alpha.2",

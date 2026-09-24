@@ -468,7 +468,8 @@ export default {
       users: "Users",
       withdrawals: "Withdrawals",
       members: "Administrators",
-      announcements: "Launcher announcements"
+      announcements: "Launcher announcements",
+      telemetry: "Telemetry"
     },
     login: {
       auth: "Login",

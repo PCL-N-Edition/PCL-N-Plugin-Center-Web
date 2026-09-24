@@ -460,7 +460,8 @@ export default {
       users: "用户",
       withdrawals: "提现审核",
       members: "管理员",
-      announcements: "启动器公告"
+      announcements: "启动器公告",
+      telemetry: "遥测监控"
     },
     login: {
       auth: "登录",
