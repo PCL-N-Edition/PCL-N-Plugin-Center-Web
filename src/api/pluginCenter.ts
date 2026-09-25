@@ -232,6 +232,7 @@ export interface LauncherDiagnostics {
   featureCatalog: string[]; metricCatalog: string[];
 }
 export const pluginCenterApi = {
+  launcherRunSummary: (days:number,version='',os='') => request<{groups:{version:string;os:string;loader:string;runs:number;ended:number;elapsed:number;peak:number|null}[];settings:{loader:string;render:string;simulation:string;runs:number;working:number|null}[];mods:{id:string;version:string;runs:number}[]}>(`/admin/launcher/runs?view=summary&days=${days}&version=${encodeURIComponent(version)}&os=${encodeURIComponent(os)}`),
   launcherRuns: (days:number,version='',os='') => request<{runs:{run:string;version:string;os:string;day:string;elapsed:number;ended:number;samples:number}[]}>(`/admin/launcher/runs?days=${days}&version=${encodeURIComponent(version)}&os=${encodeURIComponent(os)}`),
   launcherRun: (run:string,after=-1) => request<{samples:Record<string,string>[];mods:Record<string,string>[];next:number|null}>(`/admin/launcher/runs?run=${encodeURIComponent(run)}&after=${after}`),
   launcherDiagnostics: (days: number, version = "", os = "") => request<LauncherDiagnostics>(`/admin/launcher/diagnostics?${new URLSearchParams({ days: String(days), version, os })}`),
