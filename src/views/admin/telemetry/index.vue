@@ -26,11 +26,13 @@
       <section class="panel"><h2>启动器版本</h2><el-table :data="data?.versions ?? []" empty-text="尚无数据"><el-table-column prop="version" label="版本" /><el-table-column prop="count" label="启动次数" align="right" /></el-table></section>
       <section class="panel"><h2>操作系统</h2><el-table :data="data?.platforms ?? []" empty-text="尚无数据"><el-table-column label="平台"><template #default="{ row }">{{ platform(row.os) }} · {{ row.arch }}</template></el-table-column><el-table-column prop="count" label="启动次数" align="right" /></el-table></section>
     </div>
+    <RolloutPanel />
     <p class="note">{{ data ? `更新于 ${new Date(data.generatedAt).toLocaleString()}` : '数据加载后显示更新时间' }}。页面可见时每分钟刷新。</p>
   </main>
 </template>
 
 <script setup lang="ts">
+import RolloutPanel from './RolloutPanel.vue';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { pluginCenterApi } from '@/api/pluginCenter';
 const days = ref(7);

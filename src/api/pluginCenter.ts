@@ -217,7 +217,14 @@ export async function sha256Hex(blob: Blob): Promise<string> {
 
 const jsonBody = (value: unknown) => JSON.stringify(value);
 
+export interface LauncherRolloutRule {
+  id: string; kind: "update" | "feature"; target: string; basisPoints: number;
+  channels: string[]; rids: string[]; expiresAt: string; enabled: boolean;
+}
+export interface LauncherRolloutPolicy { revision: number; rules: LauncherRolloutRule[] }
 export const pluginCenterApi = {
+  launcherRollouts: () => request<LauncherRolloutPolicy>("/admin/launcher/rollouts"),
+  saveLauncherRollouts: (policy: LauncherRolloutPolicy) => request<LauncherRolloutPolicy>("/admin/launcher/rollouts", { method: "PUT", body: jsonBody(policy) }),
   launcherTelemetry: (days: number, level: string = "all") => request<{
     days: number; since: string; until: string; generatedAt: string;
     daily: { day: string; event: string; result: string; count: number }[];
