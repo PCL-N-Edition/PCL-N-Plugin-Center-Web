@@ -39,6 +39,7 @@
           </section></div>
       </template>
       <template v-else-if="section === 'coverage'"><section class="surface"><div class="heading"><div><h2>功能使用覆盖</h2><p>有多少诊断会话使用过这项功能。</p></div><span class="badge">{{ diagnostics?.sessions ?? 0 }} 个诊断会话</span></div><div v-for="row in coverage" :key="row.key" class="coverage-row"><div><b>{{ featureLabel(row.key) }}</b><small>{{ row.count }} 个会话 · {{ row.invocations }} 次采样操作</small></div><div class="track"><i :style="{width:`${Math.min(row.percent ?? 0,100)}%`}" /></div><strong>{{ row.percent === null ? '—' : `${row.percent.toFixed(1)}%` }}</strong></div><p class="caption">以一次诊断授权期间的运行会话为单位，不追踪独立用户。重复上传、队列丢弃或跨日会话可能影响比例；功能操作次数经过限流。</p></section></template>
+      <RunPanel v-else-if="section === 'runs'" :days="days" :version="version" :os="os" />
       <RolloutPanel v-else-if="section === 'rollouts'" />
     </div></Transition>
     <footer>数据更新于 {{ diagnostics ? new Date(diagnostics.generatedAt).toLocaleString() : '—' }} · 页面可见时每分钟刷新 · 诊断明细保留 90 天</footer>
@@ -49,7 +50,8 @@
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { pluginCenterApi, type LauncherDiagnostics } from '@/api/pluginCenter';
 import RolloutPanel from './RolloutPanel.vue';
-const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'rollouts',label:'灰度测试'}];
+import RunPanel from './RunPanel.vue';
+const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'runs',label:'单次运行'},{id:'rollouts',label:'灰度测试'}];
 const section=ref('overview'),days=ref(7),version=ref(''),os=ref(''),search=ref(''),errorSearch=ref(''),event=ref('app.started'),metric=ref('');
 const level=ref('all');
 const periods=[{label:'7 天',value:7},{label:'30 天',value:30},{label:'90 天',value:90}],platforms=[{label:'Windows',value:'windows'},{label:'macOS',value:'macos'},{label:'Linux',value:'linux'}];
