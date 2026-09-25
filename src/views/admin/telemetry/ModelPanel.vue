@@ -1,17 +1,17 @@
 <template>
   <section class="model-panel" :aria-busy="loading">
-    <header><div><h2>预检模型</h2><p>查看已发布模型的覆盖范围和验证表现。</p></div><button :disabled="loading" @click="load">{{ loading ? '正在读取…' : '刷新模型' }}</button></header>
+    <header><div><h2>预检模型</h2><p>查看模型状态与历史验证结果。</p></div><button :disabled="loading" @click="load">{{ loading ? '正在读取…' : '刷新模型' }}</button></header>
     <p v-if="error" class="notice" role="status">{{ error }}</p>
     <template v-if="model">
       <div class="model-summary">
-        <div><span>发布状态</span><strong>{{ expired ? '已过期' : model.models.length ? '可供客户端使用' : '暂无合格分组' }}</strong></div>
-        <div><span>覆盖分组</span><strong>{{ model.models.length }}<small> 个</small></strong></div>
-        <div><span>纳入运行</span><strong>{{ sessions }}<small> 次</small></strong></div>
+        <div><span>发布状态</span><strong>旧模型已停用</strong></div>
+        <div><span>历史分组</span><strong>{{ model.models.length }}<small> 个</small></strong></div>
+        <div><span>历史运行</span><strong>{{ sessions }}<small> 次</small></strong></div>
       </div>
       <p class="updated">生成于 {{ date(model.generatedAt) }} · 有效至 {{ date(model.expiresAt) }}</p>
       <div v-if="model.models.length" class="cohorts">
         <article v-for="item in model.models" :key="`${item.os}/${item.loader}`">
-          <div class="cohort-title"><h3>{{ platform(item.os) }} <span>／ {{ item.loader === 'Vanilla' ? '原版 Minecraft' : item.loader }}</span></h3><span class="status">{{ expired ? '已过期' : '验证通过' }}</span></div>
+          <div class="cohort-title"><h3>{{ platform(item.os) }} <span>／ {{ item.loader === 'Vanilla' ? '原版 Minecraft' : item.loader }}</span></h3><span class="status">{{ expired ? '历史结果 · 已过期' : '历史结果 · 已停用' }}</span></div>
           <dl>
             <div><dt>训练 / 验证运行</dt><dd>{{ item.samples }} / {{ item.validationSamples }} 次</dd></div>
             <div><dt>验证覆盖率</dt><dd>{{ (item.coverage * 100).toFixed(0) }}%</dd></div>
@@ -22,10 +22,10 @@
           </dl>
         </article>
       </div>
-      <div v-else class="empty"><h3>继续积累运行样本</h3><p>每个系统与加载器分组至少需要 50 次合格运行，并通过独立验证后才会发布。</p></div>
+      <div v-else class="empty"><h3>等待新的模型验证</h3><p>旧模型未区分模组组合与游戏场景，已停止用于预检。遥测继续采集，新模型通过验证前使用本地估算。</p></div>
     </template>
     <div v-else-if="!loading" class="empty"><h3>尚无可展示的模型</h3><p>模型不可用时，启动器继续使用本地估算。</p></div>
-    <aside><h3>这些数据说明什么</h3><p>模型估算游戏进程的工作集峰值。运行次数不是用户人数；覆盖率是验证样本中，实际峰值未超过预测值的比例。分位损失越低越好，但不是普通平均误差。</p><p>模型每天最多更新一次，不受上方监控时间范围影响。客户端只在训练范围内使用，且影响受限。它不会提供 JVM 堆或原生内存的实测值，也不能据此强制阻止启动。模组独立画像尚未接入。</p></aside>
+    <aside><h3>这些数据说明什么</h3><p>模型估算游戏进程的工作集峰值。运行次数不是用户人数；覆盖率是验证样本中，实际峰值未超过预测值的比例。分位损失越低越好，但不是普通平均误差。</p><p>旧模型的权重已停止发布，历史验证结果不代表对具体整合包有效。新模型需要匹配模组版本、组合和游戏场景；它仍处于开发阶段。这些数据不是 JVM 堆或原生内存的实测值，也不能据此强制阻止启动。</p></aside>
   </section>
 </template>
 
