@@ -7,6 +7,7 @@
     <nav class="sections" aria-label="监控分类"><button v-for="item in sections" :key="item.id" :class="{ active: section === item.id }" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</button></nav>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <div v-if="section !== 'rollouts'" class="filterbar">
+      <el-select v-if="section === 'overview'" v-model="level" aria-label="事件采集等级" @change="load"><el-option label="全部事件" value="all" /><el-option label="必要遥测" value="necessary" /><el-option label="诊断信息" value="diagnostic" /><el-option label="旧版遥测" value="legacy" /></el-select>
       <el-select v-model="version" clearable placeholder="全部版本" aria-label="启动器版本" @change="load"><el-option v-for="v in versionOptions" :key="v.version" :label="v.version" :value="v.version" /></el-select>
       <el-select v-model="os" clearable placeholder="全部系统" aria-label="操作系统" @change="load"><el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" /></el-select>
       <span>诊断信息 · {{ diagnostics?.sessions ?? '—' }} 个诊断会话</span>
@@ -15,7 +16,7 @@
       <template v-if="section === 'overview'">
         <div class="summary">
           <article><span>启动器启动</span><strong>{{ basic ? total('app.started').toLocaleString() : '—' }}</strong><small>当前筛选 · 事件次数</small></article>
-          <article><span>已采集事件类型</span><strong>{{ basic ? eventRows.length : '—' }}</strong><small>包含必要遥测与诊断信息</small></article>
+          <article><span>已采集事件类型</span><strong>{{ basic ? eventRows.length : '—' }}</strong><small>当前事件等级与筛选范围</small></article>
           <article><span>诊断指标</span><strong>{{ diagnostics ? measuredMetrics.length : '—' }}<em> / {{ diagnostics?.metricCatalog.length ?? '—' }}</em></strong><small>已收到样本 / 已接入指标</small></article>
         </div>
         <section class="surface"><div class="heading"><div><h2>运行趋势</h2><p>选择任意事件，查看每日变化。</p></div><el-select v-model="event" aria-label="趋势事件"><el-option v-for="row in eventRows" :key="row.event" :value="row.event" :label="eventLabel(row.event)" /></el-select></div>
@@ -50,11 +51,12 @@ import { pluginCenterApi, type LauncherDiagnostics } from '@/api/pluginCenter';
 import RolloutPanel from './RolloutPanel.vue';
 const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'rollouts',label:'灰度测试'}];
 const section=ref('overview'),days=ref(7),version=ref(''),os=ref(''),search=ref(''),errorSearch=ref(''),event=ref('app.started'),metric=ref('');
+const level=ref('all');
 const periods=[{label:'7 天',value:7},{label:'30 天',value:30},{label:'90 天',value:90}],platforms=[{label:'Windows',value:'windows'},{label:'macOS',value:'macos'},{label:'Linux',value:'linux'}];
 const basic=ref<Awaited<ReturnType<typeof pluginCenterApi.launcherTelemetry>>>(),diagnostics=ref<LauncherDiagnostics>(),loading=ref(false),error=ref(''),syncing=ref(false),syncMessage=ref('');
 const versionOptions=ref<{version:string;count:number}[]>([]);
 const selectedError=ref<LauncherDiagnostics['errors'][number]>();let generation=0,timer:ReturnType<typeof setInterval>|undefined;
-async function load(){ const current=++generation;loading.value=true;error.value='';try{const [b,d]=await Promise.all([pluginCenterApi.launcherTelemetry(days.value,'all',version.value,os.value),pluginCenterApi.launcherDiagnostics(days.value,version.value,os.value)]);if(current===generation){basic.value=b;diagnostics.value=d;versionOptions.value=[...new Map([...versionOptions.value,...b.versions].map(v=>[v.version,v])).values()];}}catch{if(current===generation)error.value='暂时无法更新监控数据，已保留上次结果。';}finally{if(current===generation)loading.value=false;}}
+async function load(){ const current=++generation;loading.value=true;error.value='';try{const [b,d]=await Promise.all([pluginCenterApi.launcherTelemetry(days.value,level.value,version.value,os.value),pluginCenterApi.launcherDiagnostics(days.value,version.value,os.value)]);if(current===generation){basic.value=b;diagnostics.value=d;versionOptions.value=[...new Map([...versionOptions.value,...b.versions].map(v=>[v.version,v])).values()];}}catch{if(current===generation)error.value='暂时无法更新监控数据，已保留上次结果。';}finally{if(current===generation)loading.value=false;}}
 async function syncIssues(){syncing.value=true;try{const result=await pluginCenterApi.syncDiagnosticIssues();syncMessage.value=result.status==='recently-synced'?'最近已执行同步。请在 15 分钟后重试。':`已完成同步，匹配 ${result.linked??0} 组错误。`;await load();}catch{syncMessage.value='GitHub 同步暂时失败，已有链接仍保留。';}finally{syncing.value=false;}}
 const syncLabel=computed(()=>diagnostics.value?.sync?.last_success?`最近成功同步：${new Date(diagnostics.value.sync.last_success).toLocaleString()}${diagnostics.value.sync.status==='failed'?' · 最新同步失败':''}`:'尚未成功同步 GitHub。每小时自动检查一次。');
 const featureNames:Record<string,string>={launch:'游戏启动',install:'版本安装',versions:'版本管理',accounts:'账户与档案',settings:'设置',tasks:'任务中心',downloads:'下载',updates:'启动器更新',wardrobe:'更衣橱',capabilities:'平台能力',other:'其他操作'};
