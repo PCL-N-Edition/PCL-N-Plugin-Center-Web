@@ -1,84 +1,86 @@
 <template>
-  <main class="telemetry-page">
-    <header>
-      <div><p class="eyebrow">NEXA 2</p><h1>遥测监控</h1><p>查看必要遥测与诊断信息的匿名汇总数据。</p></div>
-      <div class="controls">
-        <el-segmented v-model="days" :options="periods" aria-label="统计时间范围" @change="load" />
-        <el-button :loading="loading" @click="load">刷新</el-button>
-      </div>
+  <main class="observatory">
+    <header class="masthead">
+      <div><span class="eyebrow">NEXA / 运行观察</span><h1>运行监控</h1><p>查看运行趋势、性能和错误，追踪问题的处理进展。</p></div>
+      <div class="toolbar"><el-segmented v-model="days" :options="periods" aria-label="时间范围" @change="load" /><button class="refresh" :disabled="loading" @click="load">{{ loading ? '正在更新…' : '刷新数据 ↻' }}</button></div>
     </header>
-    <el-segmented v-model="level" :options="levels" aria-label="遥测级别" @change="load" />
+    <nav class="sections" aria-label="监控分类"><button v-for="item in sections" :key="item.id" :class="{ active: section === item.id }" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</button></nav>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-    <p class="note">按 UTC 日期统计事件次数，不代表独立用户数。重试可能重复计数；不包含旧版 1.x 数据。</p>
-    <section class="metrics" aria-label="事件汇总" :aria-busy="loading">
-      <article v-for="metric in metrics" :key="metric.event"><span>{{ metric.label }}</span><strong>{{ data ? metric.count.toLocaleString() : '—' }}</strong></article>
-    </section>
-    <section class="panel">
-      <div class="panel-heading"><h2>启动趋势</h2><span>{{ data ? `${data.since} — ${data.until}` : '等待数据' }}</span></div>
-      <p v-if="!loading && data && !data.daily.length" class="empty">此时间范围内尚无遥测数据。</p>
-      <div v-else class="bars" role="img" aria-label="每日启动次数；各柱可聚焦查看日期和次数">
-        <div v-for="day in trend" :key="day.day" class="bar-track" tabindex="0" :aria-label="`${day.day}：${day.count} 次启动`" :title="`${day.day} · ${day.count} 次`">
-          <span :style="{ height: `${Math.max(day.count ? 2 : 0, day.count / peak * 100)}%` }" />
-        </div>
-      </div>
-    </section>
-    <div class="breakdowns">
-      <section class="panel"><h2>启动器版本</h2><el-table :data="data?.versions ?? []" empty-text="尚无数据"><el-table-column prop="version" label="版本" /><el-table-column prop="count" label="启动次数" align="right" /></el-table></section>
-      <section class="panel"><h2>操作系统</h2><el-table :data="data?.platforms ?? []" empty-text="尚无数据"><el-table-column label="平台"><template #default="{ row }">{{ platform(row.os) }} · {{ row.arch }}</template></el-table-column><el-table-column prop="count" label="启动次数" align="right" /></el-table></section>
+    <div v-if="section !== 'rollouts'" class="filterbar">
+      <el-select v-model="version" clearable placeholder="全部版本" aria-label="启动器版本" @change="load"><el-option v-for="v in versionOptions" :key="v.version" :label="v.version" :value="v.version" /></el-select>
+      <el-select v-model="os" clearable placeholder="全部系统" aria-label="操作系统" @change="load"><el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" /></el-select>
+      <span>诊断信息 · {{ diagnostics?.sessions ?? '—' }} 个诊断会话</span>
     </div>
-    <RolloutPanel />
-    <p class="note">{{ data ? `更新于 ${new Date(data.generatedAt).toLocaleString()}` : '数据加载后显示更新时间' }}。页面可见时每分钟刷新。</p>
+    <Transition name="panel" mode="out-in"><div :key="section" :aria-busy="loading">
+      <template v-if="section === 'overview'">
+        <div class="summary">
+          <article><span>启动器启动</span><strong>{{ basic ? total('app.started').toLocaleString() : '—' }}</strong><small>当前筛选 · 事件次数</small></article>
+          <article><span>已采集事件类型</span><strong>{{ basic ? eventRows.length : '—' }}</strong><small>包含必要遥测与诊断信息</small></article>
+          <article><span>诊断指标</span><strong>{{ diagnostics ? measuredMetrics.length : '—' }}<em> / {{ diagnostics?.metricCatalog.length ?? '—' }}</em></strong><small>已收到样本 / 已接入指标</small></article>
+        </div>
+        <section class="surface"><div class="heading"><div><h2>运行趋势</h2><p>选择任意事件，查看每日变化。</p></div><el-select v-model="event" aria-label="趋势事件"><el-option v-for="row in eventRows" :key="row.event" :value="row.event" :label="eventLabel(row.event)" /></el-select></div>
+          <div class="bars"><div v-for="day in eventTrend" :key="day.day" tabindex="0" :title="`${day.day}：${day.count} 次`" :aria-label="`${day.day}：${day.count} 次`"><i :style="{ height: `${Math.max(day.count ? 2 : 0, day.count / eventPeak * 100)}%` }" /></div></div><div class="axis"><span>{{ basic?.since }}</span><span>{{ basic?.until }}</span></div>
+        </section>
+        <section class="surface"><div class="heading"><h2>全部事件</h2><el-input v-model="search" clearable placeholder="查找事件" aria-label="查找事件" /></div><div class="event-grid"><button v-for="row in filteredEvents" :key="row.event" @click="event = row.event"><span>{{ eventLabel(row.event) }}<small>{{ row.event }}</small></span><b>{{ row.count.toLocaleString() }}</b></button></div><p v-if="!filteredEvents.length" class="empty">尚无事件。升级后的客户端运行后，数据会在这里出现。</p></section>
+      </template>
+      <template v-else-if="section === 'errors'">
+        <section class="surface"><div class="heading"><div><h2>异常与警告</h2><p>按错误指纹归组，点击查看定位信息。</p></div><button class="refresh" :disabled="syncing" @click="syncIssues">{{ syncing ? '正在关联…' : '同步 GitHub Issue' }}</button></div><p class="caption" role="status">{{ syncMessage || syncLabel }}</p><el-input v-model="errorSearch" clearable placeholder="查找错误类型或子系统" aria-label="筛选异常" />
+          <button v-for="item in filteredErrors" :key="item.fingerprint" class="error-row" @click="selectedError = item"><span class="dot" :class="item.severity" /><span class="error-copy"><b>{{ item.code === 'Unknown' ? '未提供异常类型' : item.code }}</b><small>{{ featureLabel(item.category) }} · 最近出现于 {{ item.last_seen }}</small></span><span v-if="item.issue_number" class="issue">#{{ item.issue_number }} · {{ item.issue_state === 'closed' ? '已关闭' : '处理中' }}</span><strong>{{ item.count }}<small> 次</small></strong><span>›</span></button>
+          <p v-if="!filteredErrors.length" class="empty">当前筛选没有收到错误样本。没有样本不代表没有发生错误。</p>
+        </section>
+      </template>
+      <template v-else-if="['latency','resources','algorithms'].includes(section)">
+        <div class="analysis-grid"><section class="surface metric-list"><h2>{{ sections.find(s => s.id === section)?.label }}</h2><button v-for="key in visibleMetricKeys" :key="key" :class="{ chosen: activeMetric === key }" @click="metric = key"><span>{{ metricLabel(key) }}<small>{{ metricStats(key).count ? `${metricStats(key).count} 个样本` : '尚无样本' }}</small></span><b>{{ format(metricStats(key).mean, key) }}</b></button></section>
+          <section class="surface"><div class="heading"><div><h2>{{ metricLabel(activeMetric) }}</h2><p>{{ activeMetric }}</p></div><span class="badge">{{ unit(activeMetric) }}</span></div><div class="numbers"><div><small>平均值</small><strong>{{ format(metricStats(activeMetric).mean,activeMetric) }}</strong></div><div><small>P95 桶上界</small><strong>{{ format(metricStats(activeMetric).p95,activeMetric) }}</strong></div><div><small>最大值</small><strong>{{ format(metricStats(activeMetric).max,activeMetric) }}</strong></div></div>
+            <svg v-if="metricTrend.length" class="line-chart" viewBox="0 0 600 180" role="img" :aria-label="`${metricLabel(activeMetric)}每日平均值趋势`"><line x1="0" y1="170" x2="600" y2="170" /><polyline :points="chartPoints" fill="none" /><circle v-for="(row,i) in metricTrend" :key="row.day" :cx="i * 580 / Math.max(metricTrend.length-1,1)+10" :cy="170-row.mean/metricPeak*155" r="4"><title>{{ row.day }}：{{ format(row.mean,activeMetric) }}</title></circle></svg>
+            <p v-else class="empty">还没有这项指标的样本。</p><div class="axis"><span>{{ diagnostics?.since }}</span><span>{{ diagnostics?.until }}</span></div><p class="caption">每个点代表当天样本均值；P95 来自对数直方图，仅表示桶上界。有限采样不能代表全部调用。</p>
+            <el-table v-if="metricTrend.length" :data="metricTrend" size="small"><el-table-column prop="day" label="日期" /><el-table-column label="均值"><template #default="{row}">{{ format(row.mean,activeMetric) }}</template></el-table-column><el-table-column label="峰值"><template #default="{row}">{{ format(row.peak,activeMetric) }}</template></el-table-column><el-table-column prop="count" label="样本" align="right" /></el-table>
+          </section></div>
+      </template>
+      <template v-else-if="section === 'coverage'"><section class="surface"><div class="heading"><div><h2>功能使用覆盖</h2><p>有多少诊断会话使用过这项功能。</p></div><span class="badge">{{ diagnostics?.sessions ?? 0 }} 个诊断会话</span></div><div v-for="row in coverage" :key="row.key" class="coverage-row"><div><b>{{ featureLabel(row.key) }}</b><small>{{ row.count }} 个会话 · {{ row.invocations }} 次采样操作</small></div><div class="track"><i :style="{width:`${Math.min(row.percent ?? 0,100)}%`}" /></div><strong>{{ row.percent === null ? '—' : `${row.percent.toFixed(1)}%` }}</strong></div><p class="caption">以一次诊断授权期间的运行会话为单位，不追踪独立用户。重复上传、队列丢弃或跨日会话可能影响比例；功能操作次数经过限流。</p></section></template>
+      <RolloutPanel v-else-if="section === 'rollouts'" />
+    </div></Transition>
+    <footer>数据更新于 {{ diagnostics ? new Date(diagnostics.generatedAt).toLocaleString() : '—' }} · 页面可见时每分钟刷新 · 诊断明细保留 90 天</footer>
+    <el-drawer :model-value="!!selectedError" title="错误详情" size="min(640px, 94vw)" @close="selectedError = undefined"><template v-if="selectedError"><span class="eyebrow">{{ featureLabel(selectedError.category) }}</span><h2 class="error-title">{{ selectedError.code }}</h2><p>{{ selectedError.count }} 次 · {{ selectedError.severity === 'warning' ? '警告' : '错误' }}</p><h3>脱敏调用帧</h3><pre>{{ selectedError.stack || '未提供可安全上传的调用帧。' }}</pre><p class="caption">不包含日志正文、参数、文件路径或账户数据。</p><h3>GitHub Issue</h3><a v-if="selectedError.issue_number" :href="`https://github.com/PCL-N-Edition/PCL-N/issues/${selectedError.issue_number}`" target="_blank" rel="noopener noreferrer">#{{ selectedError.issue_number }} · {{ selectedError.issue_state === 'closed' ? '已关闭' : '处理中' }} ↗</a><p v-else>尚无明确匹配。可将下面的指纹标记加入相关 Issue，下一次同步会自动关联。</p><code class="fingerprint">[nexa-diag:{{ selectedError.fingerprint }}]</code><small>自动关联要求唯一指纹，或异常类型与前两个调用帧同时匹配；同步范围为最近更新的 200 个 Issue。</small></template></el-drawer>
   </main>
 </template>
-
 <script setup lang="ts">
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
+import { pluginCenterApi, type LauncherDiagnostics } from '@/api/pluginCenter';
 import RolloutPanel from './RolloutPanel.vue';
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
-import { pluginCenterApi } from '@/api/pluginCenter';
-const days = ref(7);
-const level = ref("all");
-const levels = [{ label: "全部", value: "all" }, { label: "必要遥测", value: "necessary" }, { label: "诊断信息", value: "diagnostic" }, { label: "历史协议", value: "legacy" }];
-const periods = [{ label: '7 天', value: 7 }, { label: '30 天', value: 30 }, { label: '90 天', value: 90 }];
-const data = ref<Awaited<ReturnType<typeof pluginCenterApi.launcherTelemetry>>>();
-const loading = ref(false), error = ref('');
-let generation = 0, timer: ReturnType<typeof setInterval> | undefined;
-async function load() {
-  const current = ++generation;
-  loading.value = true; error.value = '';
-  try { const result = await pluginCenterApi.launcherTelemetry(days.value, level.value); if (current === generation) data.value = result; }
-  catch (e) { if (current === generation) error.value = e instanceof Error ? e.message : '暂时无法读取遥测数据，请稍后重试。'; }
-  finally { if (current === generation) loading.value = false; }
-}
-const metrics = computed(() => [
-  { event: 'app.started', label: '启动器启动' }, { event: 'app.failure', label: '启动器异常' },
-  { event: 'game.started', label: '游戏启动' }, { event: 'game.exited', label: '游戏退出' },
-  { event: 'task.started', label: '任务开始' }, { event: 'task.finished', label: '任务结束' },
-  { event: 'update.checked', label: '更新检查' }, { event: 'rollout.checked', label: '灰度检查' },
-].map(item => ({ ...item, count: data.value?.daily.filter(row => row.event === item.event).reduce((sum, row) => sum + row.count, 0) ?? 0 })));
-const trend = computed(() => data.value ? Array.from({ length: data.value.days }, (_, i) => {
-  const day = new Date(Date.parse(data.value!.since) + i * 86400000).toISOString().slice(0, 10);
-  return { day, count: data.value!.daily.filter(row => row.day === day && row.event === 'app.started').reduce((sum, row) => sum + row.count, 0) };
-}) : []);
-const peak = computed(() => Math.max(1, ...trend.value.map(day => day.count)));
-const platform = (os: string) => ({ windows: 'Windows', macos: 'macOS', linux: 'Linux' }[os] ?? os);
-function start() { if (timer) return; void load(); timer = setInterval(() => { if (!document.hidden && !loading.value) void load(); }, 60000); }
-function stop() { clearInterval(timer); timer = undefined; generation++; loading.value = false; }
-onMounted(start); onActivated(start); onDeactivated(stop); onUnmounted(stop);
+const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'rollouts',label:'灰度测试'}];
+const section=ref('overview'),days=ref(7),version=ref(''),os=ref(''),search=ref(''),errorSearch=ref(''),event=ref('app.started'),metric=ref('');
+const periods=[{label:'7 天',value:7},{label:'30 天',value:30},{label:'90 天',value:90}],platforms=[{label:'Windows',value:'windows'},{label:'macOS',value:'macos'},{label:'Linux',value:'linux'}];
+const basic=ref<Awaited<ReturnType<typeof pluginCenterApi.launcherTelemetry>>>(),diagnostics=ref<LauncherDiagnostics>(),loading=ref(false),error=ref(''),syncing=ref(false),syncMessage=ref('');
+const versionOptions=ref<{version:string;count:number}[]>([]);
+const selectedError=ref<LauncherDiagnostics['errors'][number]>();let generation=0,timer:ReturnType<typeof setInterval>|undefined;
+async function load(){ const current=++generation;loading.value=true;error.value='';try{const [b,d]=await Promise.all([pluginCenterApi.launcherTelemetry(days.value,'all',version.value,os.value),pluginCenterApi.launcherDiagnostics(days.value,version.value,os.value)]);if(current===generation){basic.value=b;diagnostics.value=d;versionOptions.value=[...new Map([...versionOptions.value,...b.versions].map(v=>[v.version,v])).values()];}}catch{if(current===generation)error.value='暂时无法更新监控数据，已保留上次结果。';}finally{if(current===generation)loading.value=false;}}
+async function syncIssues(){syncing.value=true;try{const result=await pluginCenterApi.syncDiagnosticIssues();syncMessage.value=result.status==='recently-synced'?'最近已执行同步。请在 15 分钟后重试。':`已完成同步，匹配 ${result.linked??0} 组错误。`;await load();}catch{syncMessage.value='GitHub 同步暂时失败，已有链接仍保留。';}finally{syncing.value=false;}}
+const syncLabel=computed(()=>diagnostics.value?.sync?.last_success?`最近成功同步：${new Date(diagnostics.value.sync.last_success).toLocaleString()}${diagnostics.value.sync.status==='failed'?' · 最新同步失败':''}`:'尚未成功同步 GitHub。每小时自动检查一次。');
+const featureNames:Record<string,string>={launch:'游戏启动',install:'版本安装',versions:'版本管理',accounts:'账户与档案',settings:'设置',tasks:'任务中心',downloads:'下载',updates:'启动器更新',wardrobe:'更衣橱',capabilities:'平台能力',other:'其他操作'};
+const featureLabel=(key:string)=>featureNames[key]??key;
+const eventNames:Record<string,string>={'app.started':'启动器启动','app.failure':'启动器异常','game.started':'游戏启动','game.exited':'游戏退出','task.started':'任务开始','task.finished':'任务完成','update.checked':'更新检查','rollout.checked':'灰度检查','feature.exposed':'功能试验命中','diagnostic.session':'诊断会话','diagnostic.metric':'性能采样','diagnostic.error':'错误样本','feature.used':'功能会话覆盖','feature.invoked':'功能操作采样'};
+const eventLabel=(key:string)=>eventNames[key]??key;
+const eventRows=computed(()=>{const counts=new Map<string,number>();for(const row of basic.value?.daily??[])counts.set(row.event,(counts.get(row.event)??0)+row.count);return [...counts].map(([event,count])=>({event,count})).sort((a,b)=>b.count-a.count);});
+const filteredEvents=computed(()=>eventRows.value.filter(r=>`${r.event} ${eventLabel(r.event)}`.toLowerCase().includes(search.value.toLowerCase())));
+const total=(name:string)=>eventRows.value.find(r=>r.event===name)?.count??0;
+const eventTrend=computed(()=>basic.value?Array.from({length:days.value},(_,i)=>{const day=new Date(Date.parse(basic.value!.since)+i*86400000).toISOString().slice(0,10);return{day,count:basic.value!.daily.filter(r=>r.day===day&&r.event===event.value).reduce((n,r)=>n+r.count,0)};}):[]);
+const eventPeak=computed(()=>Math.max(1,...eventTrend.value.map(r=>r.count)));
+const measuredMetrics=computed(()=>[...new Set(diagnostics.value?.histograms.map(r=>r.metric)??[])]);
+const visibleMetricKeys=computed(()=>(diagnostics.value?.metricCatalog??[]).filter(k=>section.value==='algorithms'?k.startsWith('catalog.'):section.value==='resources'?k.endsWith('.mib')||k.endsWith('.percent'):k.endsWith('.ms')&&!k.startsWith('catalog.')));
+const activeMetric=computed(()=>visibleMetricKeys.value.includes(metric.value)?metric.value:visibleMetricKeys.value[0]??'');
+const metricNames:Record<string,string>={'network.request.ms':'网络请求耗时','launcher.working_set.mib':'启动器工作集','launcher.private.mib':'启动器私有内存','launcher.managed.mib':'托管堆','launcher.cpu.percent':'启动器 CPU','jvm.launch.ms':'JVM 启动耗时','jvm.working_set.mib':'游戏工作集峰值','catalog.results.count':'目录处理结果数','catalog.input.count':'目录输入规模','catalog.normalize.ms':'目录去重与整理耗时','catalog.cache.hit':'目录缓存命中率','scheduler.duration.ms':'调度任务耗时'};
+const metricLabel=(key:string)=>metricNames[key]??(key.startsWith('dispatch.')?`${featureLabel(key.split('.')[1])}处理耗时`:key);
+const unit=(key:string)=>key.endsWith('.mib')?'MiB':key.endsWith('.ms')?'ms':key.endsWith('.percent')?'%':key.endsWith('.hit')?'比例':'项';
+const format=(n:number|null,key:string)=>n===null?'—':`${n.toLocaleString(undefined,{maximumFractionDigits:2})} ${unit(key)}`;
+function metricStats(key:string){const rows=(diagnostics.value?.histograms??[]).filter(r=>r.metric===key).sort((a,b)=>a.bucket-b.bucket),count=rows.reduce((n,r)=>n+r.count,0);let accumulated=0,p95:number|null=null;for(const row of rows){accumulated+=row.count;if(p95===null&&accumulated>=count*.95)p95=row.bucket===-32?0:2**row.bucket;}return{count,mean:count?rows.reduce((n,r)=>n+r.total,0)/count:null,p95,max:count?Math.max(...rows.map(r=>r.max)):null};}
+const metricTrend=computed(()=>(diagnostics.value?.trends??[]).filter(r=>r.metric===activeMetric.value)),metricPeak=computed(()=>Math.max(1,...metricTrend.value.map(r=>r.mean)));
+const chartPoints=computed(()=>metricTrend.value.map((r,i)=>`${i*580/Math.max(metricTrend.value.length-1,1)+10},${170-r.mean/metricPeak.value*155}`).join(' '));
+const filteredErrors=computed(()=>(diagnostics.value?.errors??[]).filter(e=>`${e.code} ${featureLabel(e.category)}`.toLowerCase().includes(errorSearch.value.toLowerCase())));
+const coverage=computed(()=>(diagnostics.value?.featureCatalog??[]).map(key=>{const rows=diagnostics.value!.features.filter(r=>r.feature===key),count=rows.find(r=>r.event==='feature.used')?.count??0;return{key,count,invocations:rows.find(r=>r.event==='feature.invoked')?.count??0,percent:diagnostics.value!.sessions?count/diagnostics.value!.sessions*100:null};}));
+watch(section,()=>{metric.value='';});function start(){if(timer)return;void load();timer=setInterval(()=>{if(!document.hidden&&!loading.value)void load();},60000);}function stop(){clearInterval(timer);timer=undefined;generation++;loading.value=false;}onMounted(start);onActivated(start);onDeactivated(stop);onUnmounted(stop);
 </script>
-
 <style scoped>
-.telemetry-page { max-width: 1200px; margin: auto; padding: 28px; color: var(--el-text-color-primary); }
-header, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-h1 { font-size: 32px; letter-spacing: -.035em; margin: 4px 0 12px; } h2 { font-size: 18px; margin: 0 0 18px; font-weight: 600; }
-header p, .note, .panel-heading span { color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.6; }
-.eyebrow { letter-spacing: .14em; font-weight: 600; } .controls { display: flex; gap: 12px; align-items: center; }
-.note { margin: 22px 0; } .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
-.metrics article, .panel { background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 20px; padding: 24px; }
-.metrics span { display: block; font-size: 13px; color: var(--el-text-color-secondary); } .metrics strong { display: block; font-size: 36px; font-weight: 600; letter-spacing: -.04em; margin-top: 12px; font-variant-numeric: tabular-nums; }
-.bars { display: flex; gap: 4px; height: 150px; align-items: end; } .bar-track { flex: 1; height: 100%; display: flex; align-items: end; border-radius: 3px; }
-.bar-track span { display: block; width: 100%; background: var(--el-color-primary); border-radius: 3px 3px 0 0; transition: height .25s ease; }
-.bar-track:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; } .empty { text-align: center; padding: 48px; color: var(--el-text-color-secondary); }
-.breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-@media (max-width: 800px) { header { align-items: start; flex-direction: column; } .metrics { grid-template-columns: 1fr 1fr; } .breakdowns { grid-template-columns: 1fr; } .telemetry-page { padding: 16px; } }
-@media (prefers-reduced-motion: reduce) { .bar-track span { transition: none; } }
+.observatory{max-width:1440px;margin:auto;padding:40px 36px;color:var(--el-text-color-primary);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.masthead,.toolbar,.heading,.filterbar{display:flex;align-items:center;justify-content:space-between;gap:20px}.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--el-text-color-secondary);font-weight:600}h1{font-size:clamp(28px,3vw,40px);letter-spacing:-.04em;font-weight:600;margin:12px 0}h2{font-size:20px;letter-spacing:-.02em;margin:0 0 8px}p,small,.caption,footer{color:var(--el-text-color-secondary);font-size:13px;line-height:1.7}button{font:inherit;cursor:pointer}button:active{transform:scale(.985)}button:focus-visible{outline:2px solid var(--el-color-primary);outline-offset:3px}.refresh{background:var(--el-fill-color-light);border:0;padding:11px 16px;border-radius:12px;color:inherit;white-space:nowrap}.refresh:disabled{opacity:.5;cursor:wait}.sections{display:flex;gap:4px;overflow-x:auto;padding:5px;background:var(--el-fill-color-light);border-radius:16px;margin:30px 0}.sections button{background:transparent;border:0;color:var(--el-text-color-secondary);padding:12px 20px;white-space:nowrap;border-radius:12px;flex:1;transition:background .18s,color .18s}.sections .active{background:var(--el-bg-color);color:var(--el-text-color-primary);box-shadow:0 2px 7px #0000000a}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:24px 0}.summary article,.surface{background:var(--el-bg-color);border:1px solid var(--el-border-color-lighter);border-radius:24px;padding:28px}.summary span{font-size:14px;color:var(--el-text-color-secondary)}.summary strong{display:block;font-size:42px;letter-spacing:-.04em;font-weight:600;margin:12px 0}.summary em{font-style:normal;font-size:22px;color:var(--el-text-color-placeholder)}.surface{margin-bottom:20px}.heading{margin-bottom:24px}.heading p{margin:4px 0}.heading .el-select,.heading .el-input{width:240px}.filterbar{justify-content:flex-start;margin:20px 0}.filterbar .el-select{width:180px}.filterbar span{margin-left:auto;color:var(--el-text-color-secondary);font-size:12px}.bars{height:170px;display:flex;align-items:end;gap:6px}.bars>div{height:100%;flex:1;display:flex;align-items:end}.bars i{width:100%;display:block;min-height:1px;border-radius:5px 5px 0 0;background:var(--el-color-primary);transition:height .2s ease}.axis{display:flex;justify-content:space-between;color:var(--el-text-color-placeholder);font-size:11px;margin:12px 0}.event-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0 30px}.event-grid button,.metric-list button{display:flex;text-align:left;align-items:center;justify-content:space-between;gap:16px;width:100%;border:0;border-bottom:1px solid var(--el-border-color-lighter);background:transparent;color:inherit;padding:18px 0}.event-grid small,.metric-list small,.error-copy small{display:block;font-size:11px;margin-top:5px}.error-row{width:100%;display:flex;align-items:center;gap:16px;border:0;border-top:1px solid var(--el-border-color-lighter);padding:22px 0;background:transparent;color:inherit;text-align:left}.error-copy{flex:1;min-width:0;overflow-wrap:anywhere}.error-copy b{font-weight:550;font-size:14px}.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#e79024}.dot.error{background:#eb5757}.issue,.badge{font-size:12px;color:var(--el-color-primary);background:var(--el-color-primary-light-9);padding:6px 10px;border-radius:8px;white-space:nowrap}.analysis-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px}.metric-list button{font-size:13px;padding:18px 10px;border-radius:10px}.metric-list .chosen{background:var(--el-fill-color-light);color:var(--el-color-primary)}.numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:30px 0}.numbers strong{display:block;font-size:22px;font-weight:550;font-variant-numeric:tabular-nums;margin-top:8px}.line-chart{width:100%;height:200px;overflow:visible}.line-chart polyline{stroke:var(--el-color-primary);stroke-width:2.5}.line-chart circle{fill:var(--el-color-primary)}.line-chart line{stroke:var(--el-border-color-lighter)}.coverage-row{display:grid;grid-template-columns:220px 1fr 80px;align-items:center;gap:24px;padding:20px 0;border-top:1px solid var(--el-border-color-lighter)}.coverage-row small{display:block}.coverage-row strong{text-align:right;font-size:16px}.track{height:8px;background:var(--el-fill-color-light);border-radius:6px;overflow:hidden}.track i{display:block;height:100%;background:var(--el-color-primary);transition:width .2s}.empty{text-align:center;padding:60px 20px}.error-title{overflow-wrap:anywhere;font-size:22px;margin:20px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:20px;border-radius:16px;background:var(--el-fill-color-light);font-size:12px;line-height:1.8}.fingerprint{display:block;font-size:11px;overflow-wrap:anywhere;margin:20px 0}footer{text-align:center;margin:30px 0;font-size:11px}.panel-enter-active,.panel-leave-active{transition:opacity .15s ease,transform .15s ease}.panel-enter-from{opacity:0;transform:translateY(4px)}.panel-leave-to{opacity:0}.panel-leave-active{position:absolute;pointer-events:none;opacity:0}
+@media(max-width:1000px){.analysis-grid{grid-template-columns:1fr}.metric-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric-list h2{grid-column:1/-1}.masthead{align-items:flex-start;flex-direction:column}.coverage-row{grid-template-columns:180px 1fr 65px}}@media(max-width:640px){.observatory{padding:22px 14px}.summary{grid-template-columns:1fr}.event-grid{grid-template-columns:1fr}.surface{padding:20px}.toolbar,.heading,.filterbar{flex-wrap:wrap}.filterbar span{margin-left:0}.coverage-row{grid-template-columns:1fr 70px;gap:10px}.coverage-row .track{grid-row:2;grid-column:1/-1}.numbers strong{font-size:16px}.issue{display:none}.metric-list{display:block}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;transform:none!important}}
 </style>

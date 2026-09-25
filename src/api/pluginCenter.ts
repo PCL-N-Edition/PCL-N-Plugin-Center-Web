@@ -222,15 +222,26 @@ export interface LauncherRolloutRule {
   channels: string[]; rids: string[]; expiresAt: string; enabled: boolean;
 }
 export interface LauncherRolloutPolicy { revision: number; rules: LauncherRolloutRule[] }
+export interface LauncherDiagnostics {
+  days: number; since: string; until: string; generatedAt: string;
+  histograms: { metric: string; bucket: number; count: number; total: number; min: number; max: number }[];
+  trends: { day: string; metric: string; mean: number; peak: number; count: number }[];
+  errors: { fingerprint: string; category: string; severity: string; code: string; stack: string; last_seen: string; count: number; issue_number: number | null; issue_state: string | null; issue_updated: string | null }[];
+  features: { feature: string; event: string; count: number }[];
+  sessions: number; sync: { last_attempt: string; last_success: string | null; status: string } | null;
+  featureCatalog: string[]; metricCatalog: string[];
+}
 export const pluginCenterApi = {
+  launcherDiagnostics: (days: number, version = "", os = "") => request<LauncherDiagnostics>(`/admin/launcher/diagnostics?${new URLSearchParams({ days: String(days), version, os })}`),
+  syncDiagnosticIssues: () => request<{ status: string; linked?: number }>("/admin/launcher/diagnostics/sync", { method: "POST" }),
   launcherRollouts: () => request<LauncherRolloutPolicy>("/admin/launcher/rollouts"),
   saveLauncherRollouts: (policy: LauncherRolloutPolicy) => request<LauncherRolloutPolicy>("/admin/launcher/rollouts", { method: "PUT", body: jsonBody(policy) }),
-  launcherTelemetry: (days: number, level: string = "all") => request<{
+  launcherTelemetry: (days: number, level: string = "all", version = "", os = "") => request<{
     days: number; since: string; until: string; generatedAt: string;
     daily: { day: string; event: string; result: string; count: number }[];
     versions: { version: string; count: number }[];
     platforms: { os: string; arch: string; count: number }[];
-  }>(`/admin/launcher/telemetry?days=${days}&level=${encodeURIComponent(level)}`),
+  }>(`/admin/launcher/telemetry?days=${days}&level=${encodeURIComponent(level)}&version=${encodeURIComponent(version)}&os=${encodeURIComponent(os)}`),
   listMarketPlugins: async (query: { search?: string; category?: string; locale?: string; skip?: number; take?: number } = {}) => {
     const parameters = new URLSearchParams();
     if (query.search) parameters.set("search", query.search);
