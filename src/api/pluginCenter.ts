@@ -218,12 +218,12 @@ export async function sha256Hex(blob: Blob): Promise<string> {
 const jsonBody = (value: unknown) => JSON.stringify(value);
 
 export const pluginCenterApi = {
-  launcherTelemetry: (days: number) => request<{
+  launcherTelemetry: (days: number, level: string = "all") => request<{
     days: number; since: string; until: string; generatedAt: string;
     daily: { day: string; event: string; result: string; count: number }[];
     versions: { version: string; count: number }[];
     platforms: { os: string; arch: string; count: number }[];
-  }>(`/admin/launcher/telemetry?days=${days}`),
+  }>(`/admin/launcher/telemetry?days=${days}&level=${encodeURIComponent(level)}`),
   listMarketPlugins: async (query: { search?: string; category?: string; locale?: string; skip?: number; take?: number } = {}) => {
     const parameters = new URLSearchParams();
     if (query.search) parameters.set("search", query.search);

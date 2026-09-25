@@ -1,12 +1,13 @@
 <template>
   <main class="telemetry-page">
     <header>
-      <div><p class="eyebrow">NEXA 2</p><h1>遥测监控</h1><p>查看用户体验计划的匿名汇总数据。</p></div>
+      <div><p class="eyebrow">NEXA 2</p><h1>遥测监控</h1><p>查看必要遥测与诊断信息的匿名汇总数据。</p></div>
       <div class="controls">
         <el-segmented v-model="days" :options="periods" aria-label="统计时间范围" @change="load" />
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
     </header>
+    <el-segmented v-model="level" :options="levels" aria-label="遥测级别" @change="load" />
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <p class="note">按 UTC 日期统计事件次数，不代表独立用户数。重试可能重复计数；不包含旧版 1.x 数据。</p>
     <section class="metrics" aria-label="事件汇总" :aria-busy="loading">
@@ -33,6 +34,8 @@
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { pluginCenterApi } from '@/api/pluginCenter';
 const days = ref(7);
+const level = ref("all");
+const levels = [{ label: "全部", value: "all" }, { label: "必要遥测", value: "necessary" }, { label: "诊断信息", value: "diagnostic" }, { label: "历史协议", value: "legacy" }];
 const periods = [{ label: '7 天', value: 7 }, { label: '30 天', value: 30 }, { label: '90 天', value: 90 }];
 const data = ref<Awaited<ReturnType<typeof pluginCenterApi.launcherTelemetry>>>();
 const loading = ref(false), error = ref('');
@@ -40,13 +43,15 @@ let generation = 0, timer: ReturnType<typeof setInterval> | undefined;
 async function load() {
   const current = ++generation;
   loading.value = true; error.value = '';
-  try { const result = await pluginCenterApi.launcherTelemetry(days.value); if (current === generation) data.value = result; }
+  try { const result = await pluginCenterApi.launcherTelemetry(days.value, level.value); if (current === generation) data.value = result; }
   catch (e) { if (current === generation) error.value = e instanceof Error ? e.message : '暂时无法读取遥测数据，请稍后重试。'; }
   finally { if (current === generation) loading.value = false; }
 }
 const metrics = computed(() => [
   { event: 'app.started', label: '启动器启动' }, { event: 'app.failure', label: '启动器异常' },
   { event: 'game.started', label: '游戏启动' }, { event: 'game.exited', label: '游戏退出' },
+  { event: 'task.started', label: '任务开始' }, { event: 'task.finished', label: '任务结束' },
+  { event: 'update.checked', label: '更新检查' }, { event: 'rollout.checked', label: '灰度检查' },
 ].map(item => ({ ...item, count: data.value?.daily.filter(row => row.event === item.event).reduce((sum, row) => sum + row.count, 0) ?? 0 })));
 const trend = computed(() => data.value ? Array.from({ length: data.value.days }, (_, i) => {
   const day = new Date(Date.parse(data.value!.since) + i * 86400000).toISOString().slice(0, 10);
