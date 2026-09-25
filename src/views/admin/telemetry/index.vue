@@ -6,7 +6,7 @@
     </header>
     <nav class="sections" aria-label="监控分类"><button v-for="item in sections" :key="item.id" :class="{ active: section === item.id }" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</button></nav>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-    <div v-if="section !== 'rollouts'" class="filterbar">
+    <div v-if="!['rollouts','models'].includes(section)" class="filterbar">
       <el-select v-if="section === 'overview'" v-model="level" aria-label="事件采集等级" @change="load"><el-option label="全部事件" value="all" /><el-option label="必要遥测" value="necessary" /><el-option label="诊断信息" value="diagnostic" /><el-option label="旧版遥测" value="legacy" /></el-select>
       <el-select v-model="version" clearable placeholder="全部版本" aria-label="启动器版本" @change="load"><el-option v-for="v in versionOptions" :key="v.version" :label="v.version" :value="v.version" /></el-select>
       <el-select v-model="os" clearable placeholder="全部系统" aria-label="操作系统" @change="load"><el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" /></el-select>
@@ -39,7 +39,7 @@
       </template>
       <template v-else-if="section === 'coverage'"><section class="surface"><div class="heading"><div><h2>功能使用覆盖</h2><p>有多少诊断会话使用过这项功能。</p></div><span class="badge">{{ diagnostics?.sessions ?? 0 }} 个诊断会话</span></div><div v-for="row in coverage" :key="row.key" class="coverage-row"><div><b>{{ featureLabel(row.key) }}</b><small>{{ row.count }} 个会话 · {{ row.invocations }} 次采样操作</small></div><div class="track"><i :style="{width:`${Math.min(row.percent ?? 0,100)}%`}" /></div><strong>{{ row.percent === null ? '—' : `${row.percent.toFixed(1)}%` }}</strong></div><p class="caption">以一次诊断授权期间的运行会话为单位，不追踪独立用户。重复上传、队列丢弃或跨日会话可能影响比例；功能操作次数经过限流。</p></section></template>
       <RunPanel v-else-if="section === 'runs'" :days="days" :version="version" :os="os" />
-      <RolloutPanel v-else-if="section === 'rollouts'" />
+      <RolloutPanel v-else-if="section === 'rollouts'" /><ModelPanel v-else-if="section === 'models'" />
     </div></Transition>
     <footer>数据更新于 {{ diagnostics ? new Date(diagnostics.generatedAt).toLocaleString() : '—' }} · 趋势每分钟刷新；运行分析可手动刷新 · 诊断明细保留 90 天</footer>
     <el-drawer :model-value="!!selectedError" title="错误详情" size="min(640px, 94vw)" @close="selectedError = undefined"><template v-if="selectedError"><span class="eyebrow">{{ featureLabel(selectedError.category) }}</span><h2 class="error-title">{{ selectedError.code }}</h2><p>{{ selectedError.count }} 次 · {{ selectedError.severity === 'warning' ? '警告' : '错误' }}</p><h3>脱敏调用帧</h3><pre>{{ selectedError.stack || '未提供可安全上传的调用帧。' }}</pre><p class="caption">不包含日志正文、参数、文件路径或账户数据。</p><h3>GitHub Issue</h3><a v-if="selectedError.issue_number" :href="`https://github.com/PCL-N-Edition/PCL-N/issues/${selectedError.issue_number}`" target="_blank" rel="noopener noreferrer">#{{ selectedError.issue_number }} · {{ selectedError.issue_state === 'closed' ? '已关闭' : '处理中' }} ↗</a><p v-else>尚无明确匹配。可将下面的指纹标记加入相关 Issue，下一次同步会自动关联。</p><code class="fingerprint">[nexa-diag:{{ selectedError.fingerprint }}]</code><small>自动关联要求唯一指纹，或异常类型与前两个调用帧同时匹配；同步范围为最近更新的 200 个 Issue。</small></template></el-drawer>
@@ -50,7 +50,8 @@ import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watc
 import { pluginCenterApi, type LauncherDiagnostics } from '@/api/pluginCenter';
 import RolloutPanel from './RolloutPanel.vue';
 import RunPanel from './RunPanel.vue';
-const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'runs',label:'运行分析'},{id:'rollouts',label:'灰度测试'}];
+import ModelPanel from './ModelPanel.vue';
+const sections = [{id:'overview',label:'概览'},{id:'errors',label:'错误诊断'},{id:'latency',label:'响应延迟'},{id:'resources',label:'运行占用'},{id:'algorithms',label:'算法表现'},{id:'coverage',label:'功能覆盖'},{id:'runs',label:'运行分析'},{id:'rollouts',label:'灰度测试'},{id:'models',label:'预检模型'}];
 const section=ref('overview'),days=ref(7),version=ref(''),os=ref(''),search=ref(''),errorSearch=ref(''),event=ref('app.started'),metric=ref('');
 const level=ref('all');
 const periods=[{label:'7 天',value:7},{label:'30 天',value:30},{label:'90 天',value:90}],platforms=[{label:'Windows',value:'windows'},{label:'macOS',value:'macos'},{label:'Linux',value:'linux'}];

@@ -1,0 +1,101 @@
+<template>
+  <section class="model-panel" :aria-busy="loading">
+    <header><div><h2>预检模型</h2><p>查看已发布模型的覆盖范围和验证表现。</p></div><button :disabled="loading" @click="load">{{ loading ? '正在读取…' : '刷新模型' }}</button></header>
+    <p v-if="error" class="notice" role="status">{{ error }}</p>
+    <template v-if="model">
+      <div class="model-summary">
+        <div><span>发布状态</span><strong>{{ expired ? '已过期' : model.models.length ? '可供客户端使用' : '暂无合格分组' }}</strong></div>
+        <div><span>覆盖分组</span><strong>{{ model.models.length }}<small> 个</small></strong></div>
+        <div><span>纳入运行</span><strong>{{ sessions }}<small> 次</small></strong></div>
+      </div>
+      <p class="updated">生成于 {{ date(model.generatedAt) }} · 有效至 {{ date(model.expiresAt) }}</p>
+      <div v-if="model.models.length" class="cohorts">
+        <article v-for="item in model.models" :key="`${item.os}/${item.loader}`">
+          <div class="cohort-title"><h3>{{ platform(item.os) }} <span>／ {{ item.loader === 'Vanilla' ? '原版 Minecraft' : item.loader }}</span></h3><span class="status">{{ expired ? '已过期' : '验证通过' }}</span></div>
+          <dl>
+            <div><dt>训练 / 验证运行</dt><dd>{{ item.samples }} / {{ item.validationSamples }} 次</dd></div>
+            <div><dt>验证覆盖率</dt><dd>{{ (item.coverage * 100).toFixed(0) }}%</dd></div>
+            <div><dt>分位损失 / 基线</dt><dd>{{ item.validationLossMiB.toFixed(1) }} / {{ item.baselineLossMiB.toFixed(1) }} MiB</dd></div>
+            <div><dt>训练堆范围</dt><dd>{{ range(item.featureMin[1] * 4, item.featureMax[1] * 4) }} GiB</dd></div>
+            <div><dt>类路径条目</dt><dd>{{ range(item.featureMin[2] * 256, item.featureMax[2] * 256) }}</dd></div>
+            <div><dt>渲染距离</dt><dd>{{ range(Math.sqrt(item.featureMin[3] * 256), Math.sqrt(item.featureMax[3] * 256)) }} 区块</dd></div>
+          </dl>
+        </article>
+      </div>
+      <div v-else class="empty"><h3>继续积累运行样本</h3><p>每个系统与加载器分组至少需要 50 次合格运行，并通过独立验证后才会发布。</p></div>
+    </template>
+    <div v-else-if="!loading" class="empty"><h3>尚无可展示的模型</h3><p>模型不可用时，启动器继续使用本地估算。</p></div>
+    <aside><h3>这些数据说明什么</h3><p>模型估算游戏进程的工作集峰值。运行次数不是用户人数；覆盖率是验证样本中，实际峰值未超过预测值的比例。分位损失越低越好，但不是普通平均误差。</p><p>模型每天最多更新一次，不受上方监控时间范围影响。客户端只在训练范围内使用，且影响受限。它不会提供 JVM 堆或原生内存的实测值，也不能据此强制阻止启动。模组独立画像尚未接入。</p></aside>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+type Cohort = { os: string; loader: string; samples: number; validationSamples: number; coverage: number; validationLossMiB: number; baselineLossMiB: number; featureMin: number[]; featureMax: number[] };
+type Model = { generatedAt: string; expiresAt: string; models: Cohort[] };
+const model = ref<Model>();
+const loading = ref(false);
+const error = ref('');
+const now = ref(Date.now());
+const expired = computed(() => !!model.value && Date.parse(model.value.expiresAt) <= now.value);
+const sessions = computed(() => model.value?.models.reduce((sum, item) => sum + item.samples + item.validationSamples, 0) ?? 0);
+const date = (value: string) => new Date(value).toLocaleString();
+const platform = (value: string) => ({ windows: 'Windows', linux: 'Linux', macos: 'macOS' })[value] ?? value;
+const range = (low: number, high: number) => low === high ? `${+low.toFixed(2)}` : `${+low.toFixed(2)}–${+high.toFixed(2)}`;
+let request: AbortController | undefined;
+let timer: ReturnType<typeof setInterval> | undefined;
+function validate(value: any): Model {
+  if (value?.schema !== 1 || value.metric !== 'process-working-set-peak-mib' || !Array.isArray(value.models) || value.models.length > 27
+    || !Number.isFinite(Date.parse(value.generatedAt)) || !Number.isFinite(Date.parse(value.expiresAt))) throw new Error('invalid');
+  const generated = Date.parse(value.generatedAt), expires = Date.parse(value.expiresAt);
+  if (generated > Date.now() + 300000 || expires <= generated || expires - generated > 7 * 86400000) throw new Error('invalid');
+  const keys = new Set<string>();
+  let total = 0;
+  for (const item of value.models) {
+    const key = `${item.os}/${item.loader}`;
+    if (!['windows','linux','macos'].includes(item.os) || !['Vanilla','OptiFine','Forge','NeoForge','Fabric','Quilt','LiteLoader','Cleanroom','LabyMod'].includes(item.loader) || keys.has(key)
+      || !Number.isInteger(item.samples) || item.samples < 40 || item.samples > 102 || !Number.isInteger(item.validationSamples) || item.validationSamples < 10 || item.validationSamples > 26
+      || !Number.isFinite(item.coverage) || item.coverage < .8 || item.coverage > 1
+      || !Number.isFinite(item.validationLossMiB) || !Number.isFinite(item.baselineLossMiB) || item.validationLossMiB < 0 || item.baselineLossMiB < item.validationLossMiB
+      || ![item.featureMin,item.featureMax].every(v => Array.isArray(v) && v.length === 4 && v.every(n => Number.isFinite(n) && n >= 0 && n <= 16))
+      || item.featureMin.some((n: number, i: number) => n > item.featureMax[i])) throw new Error('invalid');
+    total += item.samples + item.validationSamples;
+    if (total > 128 || item.validationSamples !== Math.ceil((item.samples + item.validationSamples) / 5)) throw new Error('invalid');
+    const lower = [1, .0625, 1 / 256, 4 / 256], upper = [1, 16, 16, 16];
+    for (let i = 0; i < 4; i++) if (item.featureMin[i] < lower[i] || item.featureMax[i] > upper[i]) throw new Error('invalid');
+    keys.add(key);
+  }
+  return value;
+}
+async function load() {
+  request?.abort();
+  const controller = new AbortController(); request = controller;
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  loading.value = true; error.value = '';
+  try {
+    const response = await fetch('https://api.pcln.top/v2/launcher/resource-model', { signal: controller.signal, credentials: 'omit', cache: 'no-cache' });
+    if (!response.ok) throw new Error(response.status === 503 ? 'unavailable' : 'network');
+    const reader = response.body?.getReader(); if (!reader) throw new Error('network');
+    const chunks: Uint8Array[] = []; let length = 0;
+    try {
+      for (;;) { const { value, done } = await reader.read(); if (done) break; length += value.length; if (length > 65536) throw new Error('invalid'); chunks.push(value); }
+    } finally { await reader.cancel(); reader.releaseLock(); }
+    const bytes = new Uint8Array(length); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    const next = validate(JSON.parse(new TextDecoder().decode(bytes)));
+    if (request === controller && !controller.signal.aborted) { model.value = next; now.value = Date.now(); }
+  } catch (failure) {
+    if (request === controller) error.value = failure instanceof Error && failure.message === 'unavailable'
+      ? '服务暂未提供模型。可能尚未生成，或读取暂时失败。' : '暂时无法更新模型信息。';
+    if (request === controller && model.value) error.value += ' 下方保留上次读取的结果。';
+  } finally { clearTimeout(timeout); if (request === controller) loading.value = false; }
+}
+onMounted(() => { void load(); timer = setInterval(() => { now.value = Date.now(); }, 30000); });
+onBeforeUnmount(() => { const current = request; request = undefined; current?.abort(); clearInterval(timer); });
+</script>
+
+<style scoped>
+.model-panel{padding:32px;border:1px solid var(--el-border-color-lighter);border-radius:22px;background:var(--el-bg-color)}
+header,.cohort-title{display:flex;align-items:center;justify-content:space-between;gap:20px}h2{font-size:24px;letter-spacing:-.5px;margin:0}p{color:var(--el-text-color-secondary);line-height:1.7;font-size:13px}button{border:0;border-radius:20px;padding:10px 18px;white-space:nowrap;background:var(--el-fill-color-light);color:var(--el-text-color-primary);cursor:pointer}button:active{transform:scale(.97)}button:focus-visible{outline:2px solid var(--el-color-primary);outline-offset:3px}button:disabled{opacity:.6;cursor:wait}
+.model-summary{display:grid;grid-template-columns:2fr 1fr 1fr;gap:24px;padding:30px 0}.model-summary span,dt,.updated{color:var(--el-text-color-secondary);font-size:12px}.model-summary strong{display:block;font-size:25px;font-weight:550;letter-spacing:-.6px;margin-top:10px}.model-summary small{font-size:12px;font-weight:400}.updated{margin:0 0 24px}.cohorts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px}article{border-top:1px solid var(--el-border-color-lighter);padding-top:20px}h3{font-size:15px;font-weight:550;margin:0}.cohort-title h3 span{font-weight:400}.status{font-size:11px;color:var(--el-text-color-secondary);white-space:nowrap}dl{margin-bottom:0}dl div{display:flex;justify-content:space-between;gap:12px;padding:9px 0}dd{margin:0;font-size:13px;text-align:right;font-variant-numeric:tabular-nums}.empty{text-align:center;padding:48px 20px}.empty p{max-width:480px;margin:12px auto}aside{margin-top:30px;padding-top:24px;border-top:1px solid var(--el-border-color-lighter)}aside p:last-child{margin-bottom:0}.notice{padding:12px 16px;border-radius:12px;background:var(--el-fill-color-light)}
+@media(max-width:850px){.cohorts{grid-template-columns:1fr}.model-summary{grid-template-columns:1fr 1fr}.model-summary>div:first-child{grid-column:1/-1}}@media(max-width:600px){.model-panel{padding:22px}header{align-items:flex-start;flex-wrap:wrap}.model-summary strong{font-size:22px}}@media(prefers-reduced-motion:reduce){button:active{transform:none}}
+</style>
