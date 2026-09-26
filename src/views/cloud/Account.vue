@@ -55,7 +55,7 @@
         <button class="provider-button microsoft" :disabled="busy" @click="oauth('microsoft')"><svg viewBox="0 0 23 23" width="16" height="16" aria-hidden="true"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="12" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="12" width="10" height="10" fill="#00a4ef"/><rect x="12" y="12" width="10" height="10" fill="#ffb900"/></svg><span>使用 Microsoft 继续</span></button>
       </div>
       <p v-if="error || oauthError" class="form-error" role="alert">{{ oauthError || error }}</p>
-      <p class="login-fine">账户与会话由 auth.pcln.top 提供，一个账户可同时绑定 GitHub、Google 与 Microsoft。</p>
+      <p class="login-fine">登录前请阅读 <router-link to="/legal/terms">《Nexa Cloud 服务条款》</router-link>与 <router-link to="/legal/privacy">《隐私政策》</router-link>。账户与会话由 auth.pcln.top 提供，一个账户可同时绑定 GitHub、Google 与 Microsoft。</p>
     </div>
   </div>
 </template>

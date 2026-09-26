@@ -10,6 +10,8 @@ const router = createRouter({
       { path: 'download', component: () => import('@/views/site/download.vue') },
       { path: 'account', component: () => import('@/views/cloud/Account.vue') },
       { path: 'docs', component: () => import('@/views/cloud/Placeholder.vue'), props: { title: '文档', eyebrow: 'DOCUMENTATION', description: '' } },
+      { path: 'legal', component: () => import('@/views/cloud/LegalDocs.vue') },
+      { path: 'legal/:doc', component: () => import('@/views/cloud/LegalDocs.vue') },
       { path: 'console', redirect: '/account' },
       { path: 'operations', redirect: '/account' },
       { path: 'operations/telemetry', redirect: '/account' },
