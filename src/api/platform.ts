@@ -43,7 +43,7 @@ async function mintToken(): Promise<Session | undefined> {
 }
 
 export const platform = {
-  oauthStart: (provider: 'github' | 'microsoft', returnTo = '/account', mode: 'login' | 'link' = 'login') => {
+  oauthStart: (provider: 'github' | 'microsoft' | 'google', returnTo = '/account', mode: 'login' | 'link' = 'login') => {
     const target = new URL(`/auth/v1/oauth/${provider}/start`, AUTH_BASE);
     target.searchParams.set('return_to', returnTo);
     target.searchParams.set('mode', mode);

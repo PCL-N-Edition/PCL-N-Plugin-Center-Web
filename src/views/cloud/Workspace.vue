@@ -1,7 +1,7 @@
 <template>
   <div v-if="checking" class="empty-state" role="status">正在检查会话…</div>
   <template v-else-if="!session">
-    <div class="login-layout"><div class="login-panel"><h2>{{ scope==='operations' ? '工作人员登录' : '登录控制台' }}</h2><p>使用受支持的 OAuth 账户登录，不提供密码注册。</p><p v-if="error" class="form-error" role="alert">{{ error }}</p><button class="primary-button" :disabled="busy" @click="oauth('github')">使用 GitHub 登录</button><button class="secondary-button" :disabled="busy" @click="oauth('microsoft')">使用 Microsoft 登录</button></div></div>
+    <div class="login-layout"><div class="login-panel"><h2>{{ scope==='operations' ? '工作人员登录' : '登录控制台' }}</h2><p>使用受支持的 OAuth 账户登录，不提供密码注册。</p><p v-if="error" class="form-error" role="alert">{{ error }}</p><button class="primary-button" :disabled="busy" @click="oauth('github')">使用 GitHub 登录</button><button class="secondary-button" :disabled="busy" @click="oauth('google')">使用 Google 登录</button><button class="secondary-button" :disabled="busy" @click="oauth('microsoft')">使用 Microsoft 登录</button></div></div>
   </template>
   <template v-else>
     <div class="workspace-heading"><div><h1>{{ scope==='operations' ? '待办' : '控制台' }}</h1></div><button class="secondary-button" :disabled="busy" @click="logout">退出登录</button></div>
@@ -26,7 +26,7 @@ const tickets=ref<Ticket[]>([]), ticketsLoaded=ref(false), showResolved=ref(fals
 const visibleTickets=computed(()=>tickets.value.filter(t=>showResolved.value ? t.status==='resolved' : t.status==='open'));
 const failure=(e:unknown)=>{error.value=e instanceof Error?e.message:'操作失败，请重试。';};
 async function loadTickets(){busy.value=true;error.value='';try{const result=await platform.tickets(scope,offset.value);tickets.value=result.data;total.value=result.pagination.total;ticketsLoaded.value=true;}catch(e){failure(e);}finally{busy.value=false;}}
-function oauth(provider:'github'|'microsoft'){platform.oauthStart(provider, route.fullPath);}
+function oauth(provider:'github'|'microsoft'|'google'){platform.oauthStart(provider, route.fullPath);}
 async function logout(){busy.value=true;error.value='';await platform.logout();session.value=undefined;tickets.value=[];ticketsLoaded.value=false;busy.value=false;}
 async function submit(){busy.value=true;error.value='';message.value='';try{await platform.createTicket(subject.value,body.value);subject.value='';body.value='';message.value='请求已提交。';showResolved.value=false;await loadTickets();}catch(e){failure(e);}finally{busy.value=false;}}
 async function resolve(ticket:Ticket){busy.value=true;error.value='';try{await platform.resolve(ticket);await loadTickets();}catch(e){failure(e);}finally{busy.value=false;}}
