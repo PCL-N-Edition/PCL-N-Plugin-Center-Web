@@ -44,3 +44,32 @@ test('live releases revalidate, coalesce requests, isolate snapshots and respect
   const controller = new AbortController(); controller.abort(); const previous = calls;
   await assert.rejects(loadNexaCatalog(controller.signal), {name:'AbortError'}); assert.equal(calls,previous);
 });
+
+
+test('Alpha 4 and 5 renamed assets and legacy assets resolve on all six targets', () => {
+  const formats = { win: ['setup.exe', 'msi', 'portable.zip'], osx: ['dmg', 'portable.tar.gz'], linux: ['deb', 'rpm', 'AppImage', 'portable.tar.gz'] };
+  for (const [tag, brand] of [['v2.0.0.alpha.3', 'PCL-Nexa'], ['v2.0.0.alpha.4', 'Nexa'], ['v2.0.0.alpha.5', 'Nexa']]) {
+    const assets = Object.entries(formats).flatMap(([platform, extensions]) => ['x64', 'arm64'].flatMap(arch => extensions.flatMap(ext => {
+      const name = `${brand}-${tag.slice(1)}-${platform}-${arch}.${ext}`;
+      const url = `https://github.com/PCL-N-Edition/PCL-N/releases/download/${tag}/${name}`;
+      return [{ name, browser_download_url: url, size: 123 }, { name: name + '.asc', browser_download_url: url + '.asc', size: 123 }];
+    })));
+    const release = { tag_name: tag, assets };
+    for (const [platform, extensions] of Object.entries(formats)) for (const arch of ['x64', 'arm64']) {
+      const actual = releaseAssets(release, platform, arch);
+      assert.equal(actual.length, extensions.length, `${tag} ${platform}-${arch}`);
+      assert.deepEqual(actual.map(a => a.name), extensions.map(ext => `${brand}-${tag.slice(1)}-${platform}-${arch}.${ext}`));
+    }
+    assert.deepEqual(releaseAssets(release, 'win', 'x86'), []);
+    assert.deepEqual(releaseAssets({ ...release, assets: assets.map(a => ({ ...a, browser_download_url: a.browser_download_url + '?redirect=bad' })) }, 'win', 'x64'), []);
+  }
+});
+
+test('renamed artifacts take precedence without duplicating formats', () => {
+  const tag = 'v2.0.0.alpha.5';
+  const assets = ['PCL-Nexa', 'Nexa'].map(brand => {
+    const name = `${brand}-2.0.0.alpha.5-win-x64.msi`;
+    return { name, browser_download_url: `https://github.com/PCL-N-Edition/PCL-N/releases/download/${tag}/${name}`, size: 1 };
+  });
+  assert.deepEqual(releaseAssets({ tag_name: tag, assets }, 'win', 'x64'), [assets[1]]);
+});

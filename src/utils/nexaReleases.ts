@@ -7,11 +7,17 @@ export function nexaChannel(tag: string): "alpha" | "beta" | "ci" | "release" | 
   return match ? (match[2] as "alpha" | "beta") || (match[4] ? "ci" : "release") : null;
 }
 export function releaseAssets(release: NexaRelease, platform: string, architecture: string): NexaAsset[] {
-  const prefix = `PCL-Nexa-${release.tag_name.replace(/^v/, "")}-${platform}-${architecture}.`;
+  const version = release.tag_name.replace(/^v/, "");
+  // Alpha 4 renamed the artifacts. Keep earlier releases downloadable as published.
+  const prefixes = [`Nexa-${version}-${platform}-${architecture}.`, `PCL-Nexa-${version}-${platform}-${architecture}.`];
   const formats: Record<string, string[]> = { win: ["setup.exe", "msi", "portable.zip"], osx: ["dmg", "portable.tar.gz"], linux: ["deb", "rpm", "AppImage", "portable.tar.gz"] };
   return (formats[platform] || []).flatMap(format => {
-    const asset = release.assets.find(a => a.name === prefix + format);
-    return asset && asset.browser_download_url === `${NEXA_GITHUB}/releases/download/${release.tag_name}/${asset.name}` ? [asset] : [];
+    for (const prefix of prefixes) {
+      const asset = release.assets.find(a => a.name === prefix + format
+        && a.browser_download_url === `${NEXA_GITHUB}/releases/download/${release.tag_name}/${a.name}`);
+      if (asset) return [asset];
+    }
+    return [];
   });
 }
 export async function loadNexaCatalog(signal?: AbortSignal): Promise<{ releases: NexaRelease[]; source: "github" | "snapshot" }> {

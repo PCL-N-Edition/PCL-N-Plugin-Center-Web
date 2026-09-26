@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "test:releases": "node --test scripts/nexa-releases.test.mjs",
     "fetch:releases": "node scripts/fetch-launcher-releases.mjs",
     "build": "node scripts/fetch-nexa-releases.mjs && node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build",
     "build:test": "node scripts/fetch-nexa-releases.mjs && node scripts/fetch-launcher-releases.mjs && vue-tsc && vite build --mode test",

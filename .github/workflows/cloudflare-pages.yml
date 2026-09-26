@@ -38,6 +38,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Test release asset matching
+        run: pnpm test:releases
+
       - name: Build production site
         run: |
           if [ -n "${{ vars.VITE_SUPABASE_URL }}" ]; then
