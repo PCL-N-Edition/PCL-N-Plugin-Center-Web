@@ -73,7 +73,7 @@ async function load() {
   const timeout = setTimeout(() => controller.abort(), 10000);
   loading.value = true; error.value = '';
   try {
-    const response = await fetch('https://api.pcln.top/v2/launcher/resource-model', { signal: controller.signal, credentials: 'omit', cache: 'no-cache' });
+    const response = await fetch('/api/v1/telemetry/resource-model', { signal: controller.signal, credentials: 'same-origin', cache: 'no-cache' });
     if (!response.ok) throw new Error(response.status === 503 ? 'unavailable' : 'network');
     const reader = response.body?.getReader(); if (!reader) throw new Error('network');
     const chunks: Uint8Array[] = []; let length = 0;

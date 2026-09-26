@@ -308,7 +308,7 @@ async function refreshCatalog() {
       } else {
         selectedVersionId.value = remote[0]?.id ?? "";
       }
-      if (result.source === "github" || result.source === "cloudflare") {
+      if (result.source === "github") {
         catalogStatus.value = t("site.download.catalogReadyApi", { count: remote.length });
       } else if (result.source === "static") {
         catalogStatus.value = t("site.download.catalogReadyStatic", { count: remote.length });

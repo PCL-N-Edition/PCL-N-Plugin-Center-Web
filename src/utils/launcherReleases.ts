@@ -1,15 +1,5 @@
-import { loadGithubReleases } from "./githubReleases.ts";
-/**
- * Web version discovery:
- *
- *   1) GitHub public Releases API
- *   2) Cloudflare Worker GET /v1/launcher/releases  (R2/D1 catalog)
- *   3) Same-origin public/launcher-releases.json     (build-time snapshot)
- *   4) Baked FALLBACK_VERSIONS
- *
- * Version discovery uses live GitHub data, with Cloudflare and static fallbacks.
- * Release workflows publish the catalog to Cloudflare after assets are ready.
- */
+import { loadGithubReleases } from './githubReleases.ts';
+/** Launcher downloads use GitHub with a same-origin saved catalog fallback. */
 
 export type ReleaseChannel = "release" | "beta" | "ci";
 export type Packaging = "legacy" | "v2";
@@ -499,7 +489,7 @@ export function normalizeReleaseVersion(v: ReleaseVersion): ReleaseVersion {
   };
 }
 
-export type LauncherVersionsSource = "github" | "cloudflare" | "static" | "fallback";
+export type LauncherVersionsSource = "github" | "static" | "fallback";
 
 export interface LauncherVersionsResult {
   versions: ReleaseVersion[];
@@ -510,42 +500,6 @@ export interface LauncherVersionsResult {
 export type FetchLauncherVersionsOptions = {
   signal?: AbortSignal;
 };
-
-/**
- * Fetch launcher versions from the public Cloudflare catalog endpoint.
- */
-export async function fetchLauncherVersionsFromApi(
-  options: FetchLauncherVersionsOptions = {}
-): Promise<{ versions: ReleaseVersion[]; generatedAt?: string; source?: string }> {
-  const { signal } = options;
-  const base = String(import.meta.env.VITE_WEB_BASE_API || "").replace(/\/+$/, "");
-  if (!base) throw new Error("VITE_WEB_BASE_API is not configured");
-
-  const url = new URL(`${base}/v1/launcher/releases`);
-
-  const response = await fetch(url.toString(), {
-    cache: "no-store",
-    signal,
-    headers: { Accept: "application/json" }
-  });
-  if (!response.ok) {
-    throw new Error(`launcher releases API HTTP ${response.status}`);
-  }
-  const payload = (await response.json()) as {
-    versions?: ReleaseVersion[];
-    generatedAt?: string;
-    source?: string;
-  };
-  const list = (payload.versions ?? [])
-    .map(v => normalizeReleaseVersion({ ...v, packageAssets: v.packageAssets ?? [] } as ReleaseVersion))
-    .filter(v => v.tag);
-  if (!list.length) throw new Error("launcher releases API returned no versions");
-  return {
-    versions: sortVersions(list),
-    generatedAt: payload.generatedAt,
-    source: payload.source
-  };
-}
 
 export async function fetchLauncherVersions(
   signal?: AbortSignal,
@@ -574,19 +528,6 @@ export async function fetchLauncherVersionsWithSource(
           && a.browser_download_url === `${GH}/${DEFAULT_OWNER}/${DEFAULT_REPO}/releases/download/${r.tag_name}/${a.name}`) }));
     if (versions.length) return { versions: sortVersions(versions), source: "github", generatedAt: new Date().toISOString() };
   } catch { signal?.throwIfAborted(); }
-
-  // Cloudflare catalog remains available if GitHub cannot be reached.
-  try {
-    const remote = await fetchLauncherVersionsFromApi({ signal });
-    return {
-      versions: remote.versions,
-      source: "cloudflare",
-      generatedAt: remote.generatedAt
-    };
-  } catch (err) {
-    signal?.throwIfAborted();
-    console.warn("[download] Cloudflare launcher releases API failed:", err);
-  }
 
   // 2) Build-time snapshot / baked fallbacks.
   try {
