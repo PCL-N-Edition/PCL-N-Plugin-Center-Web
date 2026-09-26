@@ -21,7 +21,7 @@ import { platform, type Session } from '@/api/platform';
 const route = useRoute(), router = useRouter();
 const session = ref<Session>(), menuOpen = ref(false);
 const accountLabel = computed(() => session.value ? (session.value.name || '账户管理') : '登录 / 注册');
-async function loadSession() { session.value = await platform.session(); }
+async function loadSession() { session.value = await platform.session(); if (session.value && !session.value.termsAccepted && route.path !== '/account') void router.push('/account'); }
 function openAccount() { if (!session.value) { menuOpen.value = false; void router.push('/account'); return; } menuOpen.value = !menuOpen.value; }
 async function logout() { menuOpen.value = false; if (!session.value) return router.push('/account'); await platform.logout(); session.value = undefined; await router.push('/account'); }
 const onFocus = () => void loadSession();

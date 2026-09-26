@@ -1,10 +1,14 @@
-export interface Session { id: string; name: string; email?: string | null; staff?: 0 | 1; developer?: 0 | 1; scope: 'console' | 'operations' }
+export interface Session { id: string; name: string; email?: string | null; staff?: 0 | 1; developer?: 0 | 1; termsAccepted?: number; scope: 'console' | 'operations' }
 export interface LinkedIdentity { provider: 'github' | 'microsoft' | 'google'; email?: string | null; created_at: string }
+export interface PolicyStatus { kind: string; version: string; effectiveAt: string; contentHash: string; acceptedAt: string | null }
+export interface DeletionRequest { id: string; state: 'pending' | 'cancelled' | 'finalized'; requestedAt: string; executeAfter?: number; cancelledAt?: string; finalizedAt?: string }
+export interface PrivacyRequest { id: string; type: string; state: string; createdAt: string; updatedAt: string }
 export interface StoreItem { id: string; name: string; summary: string; category: string; version: string; publisher: string; description: string }
 export interface Ticket { id: string; subject: string; body: string; status: string; created_at: string; version: number }
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
 const AUTH_BASE = 'https://auth.pcln.top';
+const POLICY_VERSION = '1.0';
 let accessToken = '', currentUser: Session | undefined, restoring: Promise<Session | undefined> | undefined;
 
 const authHeaders = (): Record<string, string> => accessToken ? { Authorization: 'Bearer ' + accessToken } : {};
@@ -36,11 +40,20 @@ export interface Page<T> { data: T[]; pagination: { limit: number; offset: numbe
 async function mintToken(): Promise<Session | undefined> {
   const response = await authFetch('/auth/v1/tokens', { method: 'POST', body: '{}' });
   if (!response.ok) return undefined;
-  const data = await response.json() as { token: string; user: { id: string; name: string; email?: string | null } };
+  const data = await response.json() as { token: string; user: { id: string; name: string; email?: string | null; staff?: 0 | 1; developer?: 0 | 1; termsAccepted?: number } };
   if (!data.token || !data.user?.id) return undefined;
   accessToken = data.token;
   currentUser = { ...data.user, scope: 'console' };
   return currentUser;
+}
+
+async function authJson<T>(response: Response | Promise<Response>, fallback: string): Promise<T> {
+  const resolved = await response;
+  if (!resolved.ok) {
+    const body = await resolved.json().catch(() => ({ detail: '' }));
+    throw new ApiError(body.detail || fallback, resolved.status);
+  }
+  return await resolved.json() as T;
 }
 
 export const platform = {
@@ -49,6 +62,7 @@ export const platform = {
     target.searchParams.set('return_to', returnTo);
     target.searchParams.set('mode', mode);
     target.searchParams.set('scope', 'console');
+    if (mode === 'login') target.searchParams.set('tos', POLICY_VERSION);
     window.location.assign(target.toString());
   },
   session: () => {
@@ -56,6 +70,12 @@ export const platform = {
     restoring ??= mintToken().catch(() => undefined).finally(() => { restoring = undefined; });
     return restoring;
   },
+  acceptPolicies: async () => {
+    const result = await authJson<{ terms: { acceptedAt: string } }>(await authFetch('/auth/v1/policies/accept', { method: 'POST', body: '{}' }), '接受条款失败，请重试。');
+    if (currentUser) currentUser.termsAccepted = 1;
+    return result;
+  },
+  policiesStatus: () => authJson<{ policies: PolicyStatus[] }>(authFetch('/auth/v1/policies/status'), '暂时无法读取政策状态。'),
   identities: async () => {
     const response = await authFetch('/auth/v1/identities');
     if (!response.ok) throw new ApiError('暂时无法读取已关联的账号。', response.status);
@@ -68,6 +88,12 @@ export const platform = {
       throw new ApiError(body.detail || '解绑失败，请重试。', response.status);
     }
   },
+  deletionStatus: () => authJson<{ request: DeletionRequest | null; cooldownDays: number }>(authFetch('/auth/v1/account/delete'), '暂时无法读取注销状态。'),
+  requestDeletion: () => authJson<{ request: DeletionRequest }>(authFetch('/auth/v1/account/delete', { method: 'POST', body: '{}' }), '注销申请失败，请重试。'),
+  cancelDeletion: () => authJson<{ ok: boolean }>(authFetch('/auth/v1/account/delete', { method: 'DELETE' }), '撤销注销失败，请重试。'),
+  exportData: () => authJson<Record<string, unknown>>(authFetch('/auth/v1/account/export'), '数据导出失败，请重试。'),
+  privacyRequests: () => authJson<{ requests: PrivacyRequest[] }>(authFetch('/auth/v1/privacy-requests'), '暂时无法读取隐私请求。'),
+  createPrivacyRequest: (type: string) => authJson<{ request: PrivacyRequest }>(authFetch('/auth/v1/privacy-requests', { method: 'POST', body: JSON.stringify({ type }) }), '隐私请求提交失败，请重试。'),
   logout: async () => {
     try { await authFetch('/auth/v1/sessions/current?scope=console', { method: 'DELETE' }); } catch { /* 网络失败也要清除本地凭证 */ }
     accessToken = ''; currentUser = undefined;
