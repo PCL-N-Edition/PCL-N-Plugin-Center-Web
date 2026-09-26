@@ -17,13 +17,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ApiError, platform, type Session } from '@/api/platform';
+import { platform, type Session } from '@/api/platform';
 const route = useRoute(), router = useRouter();
 const session = ref<Session>(), menuOpen = ref(false);
 const accountLabel = computed(() => session.value ? (session.value.name || '账户管理') : '登录 / 注册');
-async function loadSession() { try { session.value = await platform.session('console'); } catch (error) { if (error instanceof ApiError && error.status === 401) session.value = undefined; } }
+async function loadSession() { session.value = await platform.session(); }
 function openAccount() { if (!session.value) { menuOpen.value = false; void router.push('/account'); return; } menuOpen.value = !menuOpen.value; }
-async function logout() { menuOpen.value = false; if (!session.value) return router.push('/account'); await platform.logout('console'); session.value = undefined; await router.push('/account'); }
+async function logout() { menuOpen.value = false; if (!session.value) return router.push('/account'); await platform.logout(); session.value = undefined; await router.push('/account'); }
 const onFocus = () => void loadSession();
 router.afterEach(() => { menuOpen.value = false; });
 onMounted(() => { void loadSession(); window.addEventListener('focus', onFocus); });

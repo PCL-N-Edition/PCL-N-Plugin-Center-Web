@@ -16,7 +16,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { platform, ApiError, type Session, type Ticket } from '@/api/platform';
+import { platform, type Session, type Ticket } from '@/api/platform';
 import Telemetry from '@/views/admin/telemetry/index.vue';
 const route=useRoute();
 const scope=route.path.startsWith('/operations') ? 'operations' : 'console';
@@ -27,8 +27,8 @@ const visibleTickets=computed(()=>tickets.value.filter(t=>showResolved.value ? t
 const failure=(e:unknown)=>{error.value=e instanceof Error?e.message:'操作失败，请重试。';};
 async function loadTickets(){busy.value=true;error.value='';try{const result=await platform.tickets(scope,offset.value);tickets.value=result.data;total.value=result.pagination.total;ticketsLoaded.value=true;}catch(e){failure(e);}finally{busy.value=false;}}
 function oauth(provider:'github'|'microsoft'){platform.oauthStart(provider, route.fullPath);}
-async function logout(){busy.value=true;error.value='';try{await platform.logout(scope);session.value=undefined;tickets.value=[];ticketsLoaded.value=false;}catch(e){failure(e);}finally{busy.value=false;}}
+async function logout(){busy.value=true;error.value='';await platform.logout();session.value=undefined;tickets.value=[];ticketsLoaded.value=false;busy.value=false;}
 async function submit(){busy.value=true;error.value='';message.value='';try{await platform.createTicket(subject.value,body.value);subject.value='';body.value='';message.value='请求已提交。';showResolved.value=false;await loadTickets();}catch(e){failure(e);}finally{busy.value=false;}}
 async function resolve(ticket:Ticket){busy.value=true;error.value='';try{await platform.resolve(ticket);await loadTickets();}catch(e){failure(e);}finally{busy.value=false;}}
-onMounted(async()=>{try{session.value=await platform.session(scope);if(!route.path.endsWith('/telemetry'))await loadTickets();}catch(e){if(!(e instanceof ApiError && e.status===401))failure(e);}finally{checking.value=false;}});
+onMounted(async()=>{session.value=await platform.session();if(session.value&&!route.path.endsWith('/telemetry'))await loadTickets();checking.value=false;});
 </script>

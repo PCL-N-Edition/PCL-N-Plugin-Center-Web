@@ -24,12 +24,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { platform, ApiError, type Session } from '@/api/platform';
+import { platform, type Session } from '@/api/platform';
 const route = useRoute();
 const session = ref<Session>(), checking = ref(true), busy = ref(false), error = ref('');
 const oauthError = computed(() => { const value = route.query.oauth_error; return typeof value === 'string' && value ? value : ''; });
 function oauth(provider:'github'|'microsoft'){ busy.value=true; platform.oauthStart(provider, '/account', 'login'); }
 function link(provider:'github'|'microsoft'){ busy.value=true; platform.oauthStart(provider, '/account', 'link'); }
-async function logout(){ busy.value=true; error.value=''; try{ await platform.logout('console'); session.value=undefined; }catch(e){ error.value=e instanceof Error?e.message:'退出登录失败，请重试。'; }finally{busy.value=false;} }
-onMounted(async()=>{try{session.value=await platform.session('console');}catch(e){if(!(e instanceof ApiError && e.status===401))error.value=e instanceof Error?e.message:'暂时无法检查账户状态。';}finally{checking.value=false;}});
+async function logout(){ busy.value=true; error.value=''; await platform.logout(); session.value=undefined; busy.value=false; }
+onMounted(async()=>{ session.value=await platform.session(); checking.value=false; });
 </script>
