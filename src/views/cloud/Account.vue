@@ -50,7 +50,7 @@
       </template>
 
       <template v-else-if="section === 'wallet'">
-        <section class="work-panel"><h2>钱包与订阅</h2><div class="empty-state"><h3>即将开放</h3><p>余额、付费资源与订阅能力尚未上线。平台暂不接受任何形式的预购或充值。</p></div></section>
+        <section class="work-panel"><h2>钱包与订阅</h2><div class="empty-state"><h3>套餐与订阅入口已开放</h3><p>Cloud+ 提供按月/按年订阅，价格按地区实时本地化。历史余额与第三方付费功能尚未上线，平台暂不接受预购或充值。</p></div><div class="actions"><router-link class="primary-button" to="/pricing">查看套餐与价格</router-link></div></section>
       </template>
 
       <template v-else-if="section === 'developer'">

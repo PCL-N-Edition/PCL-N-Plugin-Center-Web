@@ -21,6 +21,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
+    "@paddle/paddle-js": "^1.6.5",
     "element-plus": "^2.14.1",
     "marked": "^18.0.14",
     "vue": "^3.5.35",
