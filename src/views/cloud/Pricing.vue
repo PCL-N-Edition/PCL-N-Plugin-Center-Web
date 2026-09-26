@@ -8,31 +8,37 @@
     </div>
     <p class="pricing-note">价格由 Paddle 实时返回并按你的地区本地化展示。{{ isSandbox ? '当前为沙箱环境，使用测试支付方式，不会产生真实扣款。' : '' }}</p>
     <p v-if="envError" class="form-error" role="alert">{{ envError }}</p>
-    <p v-else-if="loading" class="empty-state" role="status">正在读取实时价格…</p>
-    <p v-else-if="error" class="empty-state" role="alert">{{ error }}　<button class="secondary-button" @click="loadPrices">重试</button></p>
-    <div v-else class="pricing-grid">
-      <article v-for="tier in tiers" :key="tier.name" class="work-panel pricing-card" :class="{ highlight: tier.highlight }">
-        <span v-if="tier.highlight" class="status-pill">推荐</span>
-        <h2>{{ tier.name }}</h2>
-        <p class="tier-desc">{{ tier.description }}</p>
-        <p class="tier-price"><template v-if="totals[tier.priceId[cycle]]"><strong>{{ totals[tier.priceId[cycle]] }}</strong><small> / {{ cycle === 'month' ? '月' : '年' }}</small></template><template v-else><strong>—</strong><small> 价格不可用</small></template></p>
-        <ul class="tier-features"><li v-for="feature in tier.features" :key="feature">{{ feature }}</li></ul>
-        <button v-if="tier.priceId[cycle]" class="primary-button" :disabled="busy === tier.name" @click="subscribe(tier)">{{ busy === tier.name ? '正在打开结账…' : '订阅' }}</button>
-        <p v-else class="tier-unconfigured">该档位尚未配置{{ cycle === 'month' ? '月' : '年' }}付价格</p>
-      </article>
-    </div>
+    <template v-else>
+      <p v-if="sessionReady && !canCheckout" class="form-error" role="alert">沙箱测试阶段：结账仅对网站管理员开放，普通用户暂时无法结账。</p>
+      <p v-if="loading" class="empty-state" role="status">正在读取实时价格…</p>
+      <p v-else-if="error" class="empty-state" role="alert">{{ error }}　<button class="secondary-button" @click="loadPrices">重试</button></p>
+      <div v-else class="pricing-grid">
+        <article v-for="tier in tiers" :key="tier.name" class="work-panel pricing-card" :class="{ highlight: tier.highlight }">
+          <span v-if="tier.highlight" class="status-pill">推荐</span>
+          <h2>{{ tier.name }}</h2>
+          <p class="tier-desc">{{ tier.description }}</p>
+          <p class="tier-price"><template v-if="totals[tier.priceId[cycle]]"><strong>{{ totals[tier.priceId[cycle]] }}</strong><small> / {{ cycle === 'month' ? '月' : '年' }}</small></template><template v-else><strong>—</strong><small> 价格不可用</small></template></p>
+          <ul class="tier-features"><li v-for="feature in tier.features" :key="feature">{{ feature }}</li></ul>
+          <button v-if="tier.priceId[cycle]" class="primary-button" :disabled="busy === tier.name || !canCheckout" :title="canCheckout ? '' : '沙箱测试阶段，仅网站管理员可发起结账'" @click="subscribe(tier)">{{ busy === tier.name ? '正在打开结账…' : '订阅' }}</button>
+          <p v-else class="tier-unconfigured">该档位尚未配置{{ cycle === 'month' ? '月' : '年' }}付价格</p>
+        </article>
+      </div>
+    </template>
     <p class="login-fine">订阅交易由 Paddle 作为 Merchant of Record 处理付款与税务；取消、试用与退款适用 <router-link to="/legal/refunds">《Nexa 退款、试用与订阅政策》</router-link>。</p>
   </section>
 </template>
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { initializePaddle, type Paddle } from '@paddle/paddle-js';
 import { TIERS, type Tier, type BillingCycle } from '@/config/pricing';
-import { platform } from '@/api/platform';
+import { platform, type Session } from '@/api/platform';
 
 const cycle = ref<BillingCycle>('month'), loading = ref(true), error = ref(''), busy = ref<Tier['name'] | ''>('');
 const totals = ref<Record<string, string>>({});
 const tiers = TIERS;
+// 沙箱测试门禁：仅 staff 账户可发起结账；普通用户看到明确提示，按钮禁用。
+const session = ref<Session>(), sessionReady = ref(false);
+const canCheckout = computed(() => session.value?.staff === 1);
 
 // 环境必须显式配置：禁止在未设置环境变量时静默默认，避免连错 Paddle 账户。
 const env = import.meta.env.VITE_PADDLE_ENV;
@@ -76,7 +82,7 @@ async function loadPrices() {
   finally { loading.value = false; }
 }
 watch(cycle, () => { if (!envError.value) void loadPrices(); });
-onMounted(loadPrices);
+onMounted(() => { void loadPrices(); platform.session().then(result => { session.value = result; }).finally(() => { sessionReady.value = true; }); });
 
 async function subscribe(tier: Tier) {
   busy.value = tier.name; error.value = '';
