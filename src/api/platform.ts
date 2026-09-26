@@ -1,4 +1,5 @@
-export interface Session { id: string; name: string; email?: string | null; scope: 'console' | 'operations' }
+export interface Session { id: string; name: string; email?: string | null; staff?: 0 | 1; developer?: 0 | 1; scope: 'console' | 'operations' }
+export interface LinkedIdentity { provider: 'github' | 'microsoft' | 'google'; email?: string | null; created_at: string }
 export interface StoreItem { id: string; name: string; summary: string; category: string; version: string; publisher: string; description: string }
 export interface Ticket { id: string; subject: string; body: string; status: string; created_at: string; version: number }
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -54,6 +55,18 @@ export const platform = {
     if (currentUser) return Promise.resolve(currentUser);
     restoring ??= mintToken().catch(() => undefined).finally(() => { restoring = undefined; });
     return restoring;
+  },
+  identities: async () => {
+    const response = await authFetch('/auth/v1/identities');
+    if (!response.ok) throw new ApiError('暂时无法读取已关联的账号。', response.status);
+    return await response.json() as { identities: LinkedIdentity[] };
+  },
+  unbind: async (provider: LinkedIdentity['provider']) => {
+    const response = await authFetch('/auth/v1/identities/' + provider, { method: 'DELETE' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: '' }));
+      throw new ApiError(body.detail || '解绑失败，请重试。', response.status);
+    }
   },
   logout: async () => {
     try { await authFetch('/auth/v1/sessions/current?scope=console', { method: 'DELETE' }); } catch { /* 网络失败也要清除本地凭证 */ }
