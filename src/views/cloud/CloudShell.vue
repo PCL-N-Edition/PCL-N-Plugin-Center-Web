@@ -2,27 +2,33 @@
   <div class="cloud-shell">
     <a class="skip-link" href="#cloud-content">跳至内容</a>
     <header class="cloud-header">
-      <router-link class="cloud-brand" to="/store"><span class="nexa-mark" aria-hidden="true">n</span><strong>Nexa<span>Cloud</span></strong></router-link>
-      <nav aria-label="平台入口"><router-link to="/store">商店</router-link><router-link to="/console">控制台</router-link><router-link to="/operations">管理</router-link></nav>
-      <router-link class="header-link" to="/download">获取启动器 ↗</router-link>
+      <router-link class="cloud-brand" to="/"><strong>NexaCreftLauncher</strong></router-link>
+      <nav aria-label="平台入口"><router-link to="/download">下载</router-link><router-link to="/docs">文档</router-link></nav>
+      <div class="account-menu">
+        <button class="account-status" type="button" :aria-expanded="menuOpen" aria-haspopup="menu" @click="menuOpen = !menuOpen"><span class="status-dot" aria-hidden="true"></span>{{ accountLabel }}</button>
+        <div v-if="menuOpen" class="account-dropdown" role="menu"><router-link role="menuitem" to="/account" @click="menuOpen = false">我的账户</router-link><router-link role="menuitem" to="/developer" @click="menuOpen = false">开发者控制台 / 注册成为开发者</router-link><router-link role="menuitem" to="/website-management" @click="menuOpen = false">网站管理后台 / 申请参与网站管理</router-link><div class="account-divider" role="separator"></div><button type="button" role="menuitem" @click="logout">退出登录</button></div>
+      </div>
     </header>
-    <div class="cloud-body">
-      <aside class="cloud-sidebar">
-        <p class="nav-caption">{{ operations ? 'OPERATIONS' : consolePage ? 'CONSOLE' : 'NEXASTORE' }}</p>
-        <template v-if="operations"><router-link to="/operations" :class="{selected: route.path === '/operations'}"><span>◫</span>统一待办</router-link><router-link to="/operations/telemetry" :class="{selected: route.path.endsWith('/telemetry')}"><span>⌁</span>遥测与诊断</router-link></template>
-        <template v-else-if="consolePage"><router-link class="selected" to="/console"><span>◫</span>我的工作空间</router-link><router-link to="/store"><span>◇</span>浏览商店</router-link></template>
-        <template v-else><router-link to="/store" :class="{selected: route.path.startsWith('/store') && !route.query.category}"><span>◈</span>探索</router-link><router-link v-for="c in categories" :key="c.id" :to="{path:'/store', query:{category:c.id}}" :class="{selected:route.query.category===c.id}"><span>{{ c.icon }}</span>{{ c.name }}</router-link></template>
+    <div class="cloud-body" :class="{ 'store-body': storePage }">
+      <aside v-if="!storePage" class="cloud-sidebar">
+        <p class="nav-caption">{{ route.path === '/' ? 'NEXACREFTLAUNCHER' : 'NEXA CLOUD' }}</p>
+        <router-link to="/"><span>⌂</span>首页</router-link><router-link to="/account" :class="{selected: route.path === '/account'}"><span>◎</span>账户</router-link><router-link to="/developer" :class="{selected: route.path === '/developer'}"><span>◇</span>开发者</router-link>
       </aside>
       <main id="cloud-content" class="cloud-content"><router-view :key="route.path.startsWith('/store') ? 'store' : route.path" /></main>
     </div>
-
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-const route = useRoute();
-const operations = computed(() => route.path.startsWith('/operations'));
-const consolePage = computed(() => route.path.startsWith('/console'));
-const categories = [{id:'plugin', name:'插件', icon:'⊞'}, {id:'theme',name:'界面资源',icon:'◐'}, {id:'template',name:'模板',icon:'▤'}];
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ApiError, platform, type Session } from '@/api/platform';
+const route = useRoute(), router = useRouter();
+const session = ref<Session>(), menuOpen = ref(false);
+const accountLabel = computed(() => session.value ? (session.value.name || '账户管理') : '登录 / 注册');
+async function loadSession() { try { session.value = await platform.session('console'); } catch (error) { if (error instanceof ApiError && error.status === 401) session.value = undefined; } }
+async function logout() { if (!session.value) return router.push('/account'); await platform.logout('console'); session.value = undefined; await router.push('/account'); }
+const onFocus = () => void loadSession();
+onMounted(() => { void loadSession(); window.addEventListener('focus', onFocus); });
+onUnmounted(() => window.removeEventListener('focus', onFocus));
+const storePage = computed(() => route.path.startsWith('/store'));
 </script>

@@ -1,4 +1,4 @@
-export interface Session { id: string; name: string; scope: 'console' | 'operations' }
+export interface Session { id: string; name: string; email?: string | null; scope: 'console' | 'operations' }
 export interface StoreItem { id: string; name: string; summary: string; category: string; version: string; publisher: string; description: string }
 export interface Ticket { id: string; subject: string; body: string; status: string; created_at: string; version: number }
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -17,7 +17,13 @@ export async function request<T>(path: string, init: RequestInit = {}, base = "/
 export interface Page<T> { data: T[]; pagination: { limit: number; offset: number; total: number } }
 export const platform = {
   session: (scope: string) => request<Session>(`/sessions/current?scope=${scope}`, {}, '/auth/v1'),
-  login: (name: string, password: string, scope: string) => request<Session>('/sessions', { method: 'POST', body: JSON.stringify({ name, password, scope }) }, '/auth/v1'),
+  oauthStart: (provider: 'github' | 'microsoft', returnTo = window.location.pathname, mode: 'login' | 'link' = 'login') => {
+    const target = new URL(`/auth/v1/oauth/${provider}/start`, window.location.origin);
+    target.searchParams.set('return_to', returnTo);
+    target.searchParams.set('mode', mode);
+    target.searchParams.set('scope', 'console');
+    window.location.assign(target.toString());
+  },
   logout: (scope: string) => request('/sessions/current?scope=' + scope, { method: 'DELETE' }, '/auth/v1'),
   catalog: (query: URLSearchParams) => request<Page<StoreItem>>('/resources?' + query),
   resource: (id: string) => request<StoreItem>('/resources/' + encodeURIComponent(id)),

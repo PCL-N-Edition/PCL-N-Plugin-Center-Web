@@ -169,6 +169,9 @@ watchEffect(() => {
     radial-gradient(circle at 75% 0, rgba(61, 121, 204, 0.2), transparent 30rem),
     var(--market-bg);
 }
+.thanks-page :deep(.market-header) {
+  width: 100%;
+}
 .thanks-shell {
   width: min(720px, calc(100% - 40px));
   margin: 0 auto;
