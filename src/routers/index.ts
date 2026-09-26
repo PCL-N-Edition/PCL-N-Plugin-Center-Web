@@ -29,5 +29,5 @@ const router = createRouter({
     { path: '/:pathMatch(.*)*', component: () => import('@/views/cloud/NotFound.vue') }
   ]
 });
-router.afterEach(to => { document.title = `${to.path === '/' ? 'NexaCreftLauncher' : to.path.startsWith('/account') ? '账户' : to.path.startsWith('/docs') ? '文档' : 'Nexa Cloud'} · Nexa Cloud`; });
+router.afterEach(to => { document.title = `${to.path === '/' ? 'NexaCL' : to.path.startsWith('/account') ? '账户' : to.path.startsWith('/docs') ? '文档' : 'Nexa Cloud'} · Nexa Cloud`; });
 export default router;
