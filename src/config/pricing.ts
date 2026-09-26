@@ -14,26 +14,26 @@ export const TIERS: Tier[] = [
     name: 'Lite',
     description: '轻度使用，先体验 Cloud+ 的核心能力。',
     features: ['7 天免费试用（每账户一次）', '基础云空间容量', '多设备数据同步', '社区支持'],
-    priceId: { month: '', year: '' }
+    priceId: { month: 'pri_01m3e0z6ggepqw2wegf3xgt1w6', year: 'pri_01m3e0z6mx9mdsbbqtw0q0tm6y' }
   },
   {
     name: 'Standard',
     description: '日常游玩的均衡选择。',
     features: ['包含 Lite 全部权益', '更大云空间容量', '基础 AI 配额', '工单优先处理'],
-    priceId: { month: '', year: '' }
+    priceId: { month: 'pri_01m3e0z6rsgpc0t00w74w3taxx', year: 'pri_01m3e0z6xw2sh7xax1s1hr0vgg' }
   },
   {
     name: 'Advanced',
     description: '重度玩家与内容创作者。',
     features: ['包含 Standard 全部权益', '大容量云空间', '更高 AI 配额', '多份档案同步'],
     highlight: true,
-    priceId: { month: '', year: '' }
+    priceId: { month: 'pri_01m3e0z73c36e9kn5kbj4b3z7f', year: 'pri_01m3e0z779tb5tkj92z7yb5v30' }
   },
   {
     name: 'Ultimate',
     description: '为进阶用户准备的全量权益。',
     features: ['包含 Advanced 全部权益', '最大云空间与加购折扣', 'AI 配额加量包资格', '优先支持通道'],
-    priceId: { month: '', year: '' }
+    priceId: { month: 'pri_01m3e0z7akgat4mwpcvyph3aya', year: 'pri_01m3e0z7e1tpn0c4188b62pcg5' }
   }
 ];
 
