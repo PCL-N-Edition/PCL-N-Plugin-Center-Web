@@ -1,5 +1,5 @@
 <template>
-  <NexaLayout><main id="main-content" class="wrap download-main">
+  <main id="main-content" class="download-main">
     <section class="page-intro"><span class="eyebrow">PCL Nexa / PCL N</span><h1>{{ en ? 'Choose your download.' : '下载，按你的需要。' }}</h1><p>{{ en ? 'Explore Nexa 2.0 Alpha, or continue with PCL N 1.x.' : '体验 Nexa 2.0 Alpha，或继续使用 PCL N 1.x。' }}</p></section>
     <ProductSwitch v-model="product" :label="en ? 'Product version' : '产品版本'" />
     <div class="product-panel">
@@ -22,7 +22,7 @@
     </section>
     </div>
     <section class="download-help"><div><h2>{{ en ? 'Before you start.' : '开始之前。' }}</h2><p>{{ en ? 'Installers guide you through setup. Portable archives can be extracted and opened directly.' : '安装包会引导你完成安装。便携包解压后即可打开，无需安装。' }}</p></div><div class="help-list"><details><summary>{{ en ? 'Which architecture should I choose?' : '如何选择处理器架构？' }}</summary><p>{{ en ? 'Choose x64 for Intel or AMD computers, ARM64 for Windows on ARM or ARM Linux, and Apple Silicon for M-series Macs. On macOS, check About This Mac.' : 'Intel、AMD 电脑通常选择 x64；Windows on ARM 和 ARM Linux 选择 ARM64；搭载 M 系列芯片的 Mac 选择 Apple Silicon。Mac 可在“关于本机”中确认。' }}</p></details><details><summary>{{ en ? 'What is included in the Alpha?' : 'Alpha 版目前适合怎样使用？' }}</summary><p>{{ en ? 'Try profile and installed-version switching, and game launching. Some pages are still awaiting migration. Keep your current launcher and back up saves before testing.' : '可以体验档案切换、已安装版本选择和游戏启动。部分页面仍待迁移，建议保留原启动器，并在测试前备份存档。' }}</p></details><details><summary>{{ en ? 'Need PCL N 1.x?' : '需要原来的 PCL N 1.x？' }}</summary><p>{{ en ? 'Select PCL N 1.x above to find its channels, versions and package options.' : '在页面上方选择 PCL N 1.x，即可选择原有通道、历史版本和安装选项。' }} <router-link to="/download?product=legacy">{{ en ? 'Go to 1.x downloads' : '前往 1.x 下载' }} ›</router-link></p></details></div></section>
-  </main></NexaLayout>
+  </main>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watchEffect } from 'vue';
@@ -30,7 +30,6 @@ import { useRoute, useRouter } from 'vue-router';
 import ProductSwitch from '@/components/market/ProductSwitch.vue';
 import LegacyDownloads from '@/components/market/LegacyDownloads.vue';
 import { useI18n } from 'vue-i18n';
-import NexaLayout from '@/components/market/NexaLayout.vue';
 import { NEXA_GITHUB, loadNexaCatalog, releaseAssets, type NexaRelease } from '@/utils/nexaReleases';
 import { watchReleaseUpdates } from '@/utils/githubReleases';
 import { applyPageSeo } from '@/utils/seo';

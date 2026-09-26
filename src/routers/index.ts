@@ -7,6 +7,7 @@ const router = createRouter({
       { path: '', component: () => import('@/views/cloud/Home.vue') },
       { path: 'store', component: () => import('@/views/cloud/Store.vue') },
       { path: 'store/:id', component: () => import('@/views/cloud/Store.vue') },
+      { path: 'download', component: () => import('@/views/site/download.vue') },
       { path: 'account', component: () => import('@/views/cloud/Account.vue') },
       { path: 'developer', component: () => import('@/views/cloud/Placeholder.vue'), props: { title: '开发者', eyebrow: 'DEVELOPER', description: '开发者工作空间正在准备中。发布、组织与资源管理将在完成账户接入后开放。' } },
       { path: 'website-management', component: () => import('@/views/cloud/Placeholder.vue'), props: { title: '网站管理申请', eyebrow: 'WEBSITE MANAGEMENT', description: '网站管理申请入口正在准备中。请先完成账户登录，后续申请流程将在此开放。' } },
@@ -16,8 +17,7 @@ const router = createRouter({
       { path: 'operations/telemetry', redirect: '/account' },
       { path: 'about', redirect: '/' }
     ] },
-    { path: '/launcher', component: () => import('@/views/site/index.vue') },
-    { path: '/download', component: () => import('@/views/site/download.vue') },
+    { path: '/launcher', redirect: '/' },
     { path: '/download/thanks', component: () => import('@/views/site/download-thanks.vue') },
     { path: '/download/legacy', redirect: '/download?product=legacy' },
     { path: '/changelog', component: () => import('@/views/site/changelog.vue') },
